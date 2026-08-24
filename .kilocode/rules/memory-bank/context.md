@@ -30,6 +30,7 @@ The template is a clean Next.js 16 starter with TypeScript and Tailwind CSS 4. I
 | `src/app/globals.css` | Global styles | ✅ Ready |
 | `.kilocode/` | AI context & recipes | ✅ Ready |
 | `libmem/` | 32-bit x86 memory library (NASM + GCC -m32) | ✅ Built |
+| `boot/` | 16-bit BIOS boot sector (NASM -f bin) | ✅ Built |
 
 ## Current Focus
 
@@ -106,6 +107,7 @@ export async function GET() {
 - [x] C test harness `test_link.c` — 8 functional tests, zero warnings, links `libmymem.a` + `libmysecure.a`
 - [x] C test harness `test_suite.c` — 10-test comprehensive colour-coded harness
 - [x] **Epic colour-coded `README.md`** added to repo root covering both Next.js frontend and libmem assembly library
+- [x] **BIOS bootloader** (`boot/boot.asm`) — 512-byte boot sector printing a multi-colour ASCII-art banner to the BIOS console via INT 0x10 teletype (16-bit real mode, NASM -f bin)
 
 ## Session History
 
@@ -114,3 +116,4 @@ export async function GET() {
 | Initial | Template created with base setup |
 | 2026-08-24 | Built modular 32-bit x86 memory library (`libmem/`) across 5 phases: memset, memzero, memset_rev, memzero_rev, secure_wipe_stack_rev — assembled via NASM -f elf32, archived into `libmymem.a` + `libmysecure.a`, verified with C test harness (8 tests + 10-test colour-coded suite, zero warnings) |
 | 2026-08-24 | Created epic colour-coded `README.md` in repo root documenting both the Next.js 16 frontend stack and the libmem assembly library, including architecture diagrams, phase-by-phase build notes, DSE-prevention explanation, and full test results table |
+| 2026-08-24 | Added `boot/` directory with a 512-byte BIOS bootloader (`boot.asm`) that prints a multi-colour ASCII-art banner to the console via INT 0x10 teletype in 16-bit real mode; plus `Makefile`, `README.md`, and `.gitignore` for build artifacts |
