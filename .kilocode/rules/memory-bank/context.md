@@ -111,7 +111,7 @@ export async function GET() {
 - [x] C test harness `test_link.c` — 8 functional tests, zero warnings, links `libmymem.a` + `libmysecure.a`
 - [x] C test harness `test_suite.c` — 10-test comprehensive colour-coded harness
 - [x] **Epic colour-coded `README.md`** added to repo root covering both Next.js frontend and libmem assembly library
-- [x] **BIOS bootloader** (`boot/boot.asm`) — 512-byte boot sector that calls 16-bit ports of all 5 libmem memory routines, prints colour-coded PASS/FAIL results via INT 0x10 teletype; all 5 tests PASS in QEMU
+- [x] **BIOS bootloader** (`boot/boot.asm`) — 512-byte boot sector with modular 16-bit ports of all 5 libmem memory routines (separate .asm files with global/extern, %include'd into boot.asm), table-driven test runner + edge-case tests (NULL safety + count==0); 6/6 tests PASS in QEMU, 512 bytes, 0xAA55 signature
 
 ## Session History
 
@@ -120,4 +120,4 @@ export async function GET() {
 | Initial | Template created with base setup |
 | 2026-08-24 | Built modular 32-bit x86 memory library (`libmem/`) across 5 phases: memset, memzero, memset_rev, memzero_rev, secure_wipe_stack_rev — assembled via NASM -f elf32, archived into `libmymem.a` + `libmysecure.a`, verified with C test harness (8 tests + 10-test colour-coded suite, zero warnings) |
 | 2026-08-24 | Created epic colour-coded `README.md` in repo root documenting both the Next.js 16 frontend stack and the libmem assembly library, including architecture diagrams, phase-by-phase build notes, DSE-prevention explanation, and full test results table |
-| 2026-08-24 | Added `boot/` directory with a 512-byte BIOS bootloader that ports all 5 libmem memory routines (memset, memzero, memset_rev, memzero_rev, secure_wipe) to 16-bit real mode, tests them on-boot, and prints colour-coded PASS/FAIL results to the BIOS console via INT 0x10 teletype; all 5 tests PASS in QEMU; verified 512-byte size + 0xAA55 signature |
+| 2026-08-24 | Bootloaded restructured: modular 16-bit .asm files (memset/memzero/memset_rev/memzero_rev/secure_wipe) with global/extern directives, %include'd into boot.asm; table-driven test runner with indirect `call word [bp+2]`; added edge-case tests (NULL + count==0); fixed BX corruption bug (switched table pointer to BP); all 6/6 tests PASS in QEMU, verified 512-byte size + 0xAA55 signature |

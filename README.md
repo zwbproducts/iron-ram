@@ -137,9 +137,15 @@ make test-suite   # 10-test comprehensive colour-coded harness (test_suite.c)
     └── .gitignore               # Excludes *.o, *.a, binaries
 │
 └── boot/                        # ← ─────── BIOS boot sector (16-bit real mode)
-    ├── boot.asm                 # 512-byte boot sector (INT 0x10 teletype + libmem tests)
+    ├── boot.asm                 # entry point + table-driven test runner
+    ├── memset.asm               # 16-bit memset (port of libmem/memset.asm)
+    ├── memzero.asm              # delegates to memset (extern)
+    ├── memset_rev.asm           # 16-bit backward fill
+    ├── memzero_rev.asm          # delegates to memset_rev
+    ├── secure_wipe.asm          # black-box secure wipe (extern memset_rev)
     ├── Makefile                 # make / make run / make clean
-    └── README.md                # Bootloader documentation
+    ├── README.md                # Bootloader documentation
+    └── .gitignore               # boot.bin, *.lst
 ```
 
 ---
@@ -355,12 +361,16 @@ ANSI colour legend (mirrors `test_suite.c`):
 
 ## 🥾 Bootloader (BIOS Console)
 
-> **Live-tested** — all 5 memory routines pass in QEMU.
+> **Live-tested** — 6/6 tests PASS in QEMU (5 functions + edge cases).
 
-A minimal **512-byte boot sector** in `boot/` that **calls our memory functions**
-and prints the results to the BIOS console via **INT 0x10 teletype**. Since
-the 32-bit `libmem/` objects can't link in 16-bit real mode, this sector ships
-compact 16-bit ports of the same five algorithms and tests them on-boot.
+A **512-byte boot sector** in `boot/` that runs its **own 16-bit memory
+routines** (not BIOS libraries) and prints PASS/FAIL results to the BIOS
+console via **INT 0x10 teletype**.
+
+Each function lives in its own `.asm` file with `global`/`extern` directives
+mirroring the 32-bit `libmem/` structure; `boot.asm` pulls them in via
+`%include` and tests them with a **table-driven runner** plus **edge-case
+tests** (NULL safety + count==0).
 
 | Property | Value |
 |:--|:--|
@@ -377,12 +387,13 @@ compact 16-bit ports of the same five algorithms and tests them on-boot.
 | `memset_rev` | backward fill (`dec di`) | ✅ PASS |
 | `memzero_rev` | delegates to `memset_rev` | ✅ PASS |
 | `secure_wipe` | black-box → `memset_rev` | ✅ PASS |
+| `edge: NULL+0` | NULL safety + count==0 | ✅ PASS |
 
 ```
-cd boot && make run    # builds + launches in QEMU
+cd boot && make run    # builds + launches in QEMU (6/6 PASS)
 ```
 
-See [`boot/README.md`](boot/README.md) for full details.
+See [`boot/README.md`](boot/README.md) for the modular file structure and full docs.
 cd boot
 nasm -f bin boot.asm -o boot.bin
 qemu-system-x86_64 -drive format=raw,file=boot.bin
