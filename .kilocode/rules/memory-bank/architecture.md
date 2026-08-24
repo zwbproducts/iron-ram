@@ -118,3 +118,27 @@ For simple needs:
 For complex needs (add when necessary):
 - Zustand for client state
 - React Query for server state
+
+## x86-32 Memory Library Architecture (libmem/)
+
+### Directory Structure
+
+```
+libmem/
+├── mymem.h                    # Public header (all prototypes)
+├── memset.asm                 # Phase 1: forward byte fill
+├── memzero.asm                # Phase 2: forward zero-fill (→ memset)
+├── memset_rev.asm             # Phase 3: backward byte fill
+├── memzero_rev.asm            # Phase 3: backward zero-fill (→ memset_rev)
+├── secure_wipe_stack_rev.asm  # Phase 5: secure wipe (→ memset_rev, libmysecure.a)
+├── Makefile                   # NASM -f elf32 + ar rcs rules
+└── test_link.c                # C test harness (8 tests)
+```
+
+### Design Principle: DSE Prevention
+
+Security-critical functions are isolated in a separate static library
+(`libmysecure.a`) and delegate to general memory routines (`memset_rev`
+in `libmymem.a`) via unresolved external symbols.  This forces the C
+compiler to treat the call as a black box with side effects, preventing
+Dead-Store Elimination (DSE) when clearing sensitive stack frames.

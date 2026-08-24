@@ -91,12 +91,39 @@ bun typecheck      # Run TypeScript type checking
 ├── eslint.config.mjs       # ESLint configuration
 ├── public/                 # Static assets
 │   └── .gitkeep
-└── src/                    # Source code
-    └── app/                # Next.js App Router
-        ├── layout.tsx      # Root layout
-        ├── page.tsx        # Home page
-        ├── globals.css     # Global styles
-        └── favicon.ico     # Site icon
+├── src/                    # Source code
+│   └── app/                # Next.js App Router
+│       ├── layout.tsx      # Root layout
+│       ├── page.tsx        # Home page
+│       ├── globals.css     # Global styles
+│       └── favicon.ico     # Site icon
+└── libmem/                 # 32-bit x86 memory library (NASM + GCC -m32)
+    ├── mymem.h             # C header (all prototypes)
+    ├── memset.asm          # Phase 1: forward byte fill
+    ├── memzero.asm         # Phase 2: → memset delegation
+    ├── memset_rev.asm      # Phase 3: backward byte fill
+    ├── memzero_rev.asm     # Phase 3: → memset_rev delegation
+    ├── secure_wipe_stack_rev.asm  # Phase 5: → memset_rev (libmysecure.a)
+    ├── Makefile            # nasm -f elf32 + ar rcs
+    ├── test_link.c         # C test harness (8 tests)
+    ├── libmymem.a          # Build artifact (gitignored)
+    └── libmysecure.a       # Build artifact (gitignored)
+```
+
+## x86-32 Build Toolchain
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| NASM  | 2.15+  | Assemble ELF32 (.o) from .asm sources |
+| GCC   | 11.4+  | Compile/link C test harness (-m32, cdecl) |
+| GNU ar| 2.38+  | Create static archives (.a) |
+
+Build from `libmem/`:
+
+```bash
+make all      # Assemble + archive libmymem.a and libmysecure.a
+make test     # Build + run test_link (8 functional tests, zero warnings)
+make clean    # Remove all build artifacts
 ```
 
 ## Technical Constraints
