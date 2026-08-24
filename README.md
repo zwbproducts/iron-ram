@@ -41,8 +41,9 @@
   - [Functions Overview](#functions-overview)
   - [Phase-by-Phase Build](#phase-by-phase-build)
   - [📊 DSE Prevention Architecture](#-dse-prevention-architecture)
-- [🧪 Tests](#-tests)
-- [🛠️ Development Scripts](#️-development-scripts)
+  - [🧪 Tests](#-tests)
+  - [🥾 Bootloader (BIOS Console)](#-bootloader-bios-console)
+  - [🛠️ Development Scripts](#️-development-scripts)
 
 </td>
 
@@ -134,6 +135,11 @@ make test-suite   # 10-test comprehensive colour-coded harness (test_suite.c)
     ├── test_link.c              # Basic 8-test harness
     ├── test_suite.c             # Comprehensive 10-test colour-coded harness
     └── .gitignore               # Excludes *.o, *.a, binaries
+│
+└── boot/                        # ← ─────── BIOS boot sector (16-bit real mode)
+    ├── boot.asm                 # 512-byte boot sector (INT 0x10 teletype)
+    ├── Makefile                 # make / make run / make clean
+    └── README.md                # Bootloader documentation
 ```
 
 ---
@@ -338,6 +344,36 @@ ANSI colour legend (mirrors `test_suite.c`):
 <span style="color:#f59e0b;">● Yellow</span> — test names &nbsp;|&nbsp;
 <span style="color:#22c55e;">● Green</span> — PASS &nbsp;|&nbsp;
 <span style="color:#ef4444;">● Red</span> — FAIL
+
+---
+
+### `libmem/`
+
+8-test harness (colour-coded cyan/yellow/green/red)...
+
+---
+
+## 🥾 Bootloader (BIOS Console)
+
+A minimal **512-byte boot sector** in `boot/` that prints a multi-colour
+ASCII-art banner directly to the BIOS console via **INT 0x10 teletype** —
+no operating system required.
+
+| Property | Value |
+|:--|:--|
+| Mode | 16-bit real mode |
+| Entry | `CS:IP` = `0x0000:0x7C00` |
+| Output | BIOS video teletype (`AH=0x0E`) |
+| Colours | gold / cyan / green / magenta (`BL`) |
+| Size | exactly 512 bytes (510 + `0xAA55` signature) |
+
+See [`boot/README.md`](boot/README.md) for build & run instructions.
+
+```
+cd boot
+nasm -f bin boot.asm -o boot.bin
+qemu-system-x86_64 -drive format=raw,file=boot.bin
+```
 
 ---
 
