@@ -10,7 +10,7 @@ ARFLAGS = rcs
 LIBMEM_OBJS = memset.o memzero.o memset_rev.o memzero_rev.o
 LIBSECURE_OBJS = secure_wipe_stack_rev.o
 
-.PHONY: all clean test
+.PHONY: all clean test test-suite
 
 all: libmymem.a libmysecure.a
 
@@ -28,5 +28,10 @@ test: all test_link.c
 		-o test_link test_link.c -L. -lmysecure -lmymem
 	./test_link
 
+test-suite: all test_suite.c
+	$(CC) -m32 -fno-builtin -fno-stack-protector -Wall -Wextra -std=c11 \
+		-o test_suite test_suite.c -L. -lmysecure -lmymem
+	./test_suite
+
 clean:
-	rm -f *.o *.a test_link
+	rm -f *.o *.a test_link test_suite

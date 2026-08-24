@@ -1,0 +1,36 @@
+=== Build Output (make clean && make all) ===
+rm -f *.o *.a test_link test_suite
+nasm -f elf32 memset.asm -o memset.o
+nasm -f elf32 memzero.asm -o memzero.o
+nasm -f elf32 memset_rev.asm -o memset_rev.o
+nasm -f elf32 memzero_rev.asm -o memzero_rev.o
+ar rcs libmymem.a memset.o memzero.o memset_rev.o memzero_rev.o
+nasm -f elf32 secure_wipe_stack_rev.asm -o secure_wipe_stack_rev.o
+ar rcs libmysecure.a secure_wipe_stack_rev.o
+
+=== Basic Test (make test) ===
+gcc -m32 -fno-builtin -fno-stack-protector -Wall -Wextra -std=c11 \
+	-o test_link test_link.c -L. -lmysecure -lmymem
+./test_link
+All 8 tests passed (libmymem.a + libmysecure.a)
+
+=== Comprehensive Test Suite (make test-suite) ===
+gcc -m32 -fno-builtin -fno-stack-protector -Wall -Wextra -std=c11 \
+	-o test_suite test_suite.c -L. -lmysecure -lmymem
+./test_suite
+[36m[1m========================================================
+  libmem / libmysecure — Comprehensive Test Suite
+========================================================
+[0m[33m  [TEST] [0mmemset forward fill              [32mPASS[0m
+[33m  [TEST] [0mmemset partial fill              [32mPASS[0m
+[33m  [TEST] [0mmemzero forward                  [32mPASS[0m
+[33m  [TEST] [0mmemset_rev backward fill         [32mPASS[0m
+[33m  [TEST] [0mmemzero_rev backward             [32mPASS[0m
+[33m  [TEST] [0msecure_wipe_stack_rev            [32mPASS[0m
+[33m  [TEST] [0mcount == 0 edge cases            [32mPASS[0m
+[33m  [TEST] [0mNULL dest safety                 [32mPASS[0m
+[33m  [TEST] [0mreturn value correctness         [32mPASS[0m
+[33m  [TEST] [0mmemset_rev partial fill          [32mPASS[0m
+[36m--------------------------------------------------------
+[0m[32m[1m  ALL 10 TESTS PASSED  (libmymem.a + libmysecure.a)
+[0m

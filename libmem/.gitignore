@@ -1,3 +1,4 @@
 *.o
 *.a
 test_link
+test_suite
