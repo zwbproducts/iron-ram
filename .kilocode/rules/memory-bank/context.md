@@ -43,6 +43,10 @@ has been completed across all 5 phases:
 4. `libmymem.a` — general memory routines archive
 5. `libmysecure.a` — isolated secure stack wipe preventing DSE
 
+The BIOS bootloader (`boot/`) ports all five algorithms to 16-bit real mode,
+tests them on-boot, and prints colour-coded results via BIOS INT 0x10.
+Verified: 5/5 tests PASS, 512-byte binary, 0xAA55 signature.
+
 ## Quick Start Guide
 
 ### To add a new page:
