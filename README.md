@@ -137,7 +137,7 @@ make test-suite   # 10-test comprehensive colour-coded harness (test_suite.c)
     └── .gitignore               # Excludes *.o, *.a, binaries
 │
 └── boot/                        # ← ─────── BIOS boot sector (16-bit real mode)
-    ├── boot.asm                 # 512-byte boot sector (INT 0x10 teletype)
+    ├── boot.asm                 # 512-byte boot sector (INT 0x10 teletype + libmem tests)
     ├── Makefile                 # make / make run / make clean
     └── README.md                # Bootloader documentation
 ```
@@ -355,21 +355,34 @@ ANSI colour legend (mirrors `test_suite.c`):
 
 ## 🥾 Bootloader (BIOS Console)
 
-A minimal **512-byte boot sector** in `boot/` that prints a multi-colour
-ASCII-art banner directly to the BIOS console via **INT 0x10 teletype** —
-no operating system required.
+> **Live-tested** — all 5 memory routines pass in QEMU.
+
+A minimal **512-byte boot sector** in `boot/` that **calls our memory functions**
+and prints the results to the BIOS console via **INT 0x10 teletype**. Since
+the 32-bit `libmem/` objects can't link in 16-bit real mode, this sector ships
+compact 16-bit ports of the same five algorithms and tests them on-boot.
 
 | Property | Value |
 |:--|:--|
 | Mode | 16-bit real mode |
 | Entry | `CS:IP` = `0x0000:0x7C00` |
 | Output | BIOS video teletype (`AH=0x0E`) |
-| Colours | gold / cyan / green / magenta (`BL`) |
+| Colours | cyan / yellow / green / red (`BL`) |
 | Size | exactly 512 bytes (510 + `0xAA55` signature) |
 
-See [`boot/README.md`](boot/README.md) for build & run instructions.
+| Test | Algorithm | Result |
+|----|:------:|:------:|
+| `memset` | forward fill (`inc di`) | ✅ PASS |
+| `memzero` | delegates to `memset` | ✅ PASS |
+| `memset_rev` | backward fill (`dec di`) | ✅ PASS |
+| `memzero_rev` | delegates to `memset_rev` | ✅ PASS |
+| `secure_wipe` | black-box → `memset_rev` | ✅ PASS |
 
 ```
+cd boot && make run    # builds + launches in QEMU
+```
+
+See [`boot/README.md`](boot/README.md) for full details.
 cd boot
 nasm -f bin boot.asm -o boot.bin
 qemu-system-x86_64 -drive format=raw,file=boot.bin
