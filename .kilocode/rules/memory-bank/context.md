@@ -8,6 +8,21 @@ The template is a clean Next.js 16 starter with TypeScript and Tailwind CSS 4. I
 
 ## Recently Completed
 
+## Current State
+
+**All builds & tests pass.** Repo cleaned of tracked binary artifacts; `os/.gitignore` added.
+
+### Build & Test Results (2026-08-25)
+
+| Component | Build | Run |
+|-----------|-------|-----|
+| `libmem/` (32-bit x86 memory library) | ✅ 0 warnings | ✅ 10/10 tests PASS |
+| `os/` (32-bit protected mode kernel) | ✅ 0 warnings | Builds into `disk.img` (stage1 stub) |
+| `boot/` (16-bit BIOS boot stack) | ✅ 0 warnings | ✅ 6/6 + edge cases PASS in QEMU |
+| Next.js 16 frontend | ✅ typecheck + lint clean | N/A |
+
+## Recently Completed
+
 - [x] Base Next.js 16 setup with App Router
 - [x] TypeScript configuration with strict mode
 - [x] Tailwind CSS 4 integration
@@ -20,6 +35,9 @@ The template is a clean Next.js 16 starter with TypeScript and Tailwind CSS 4. I
 - [x] **Phase 4**: `mymem.h` header + `Makefile` → `libmymem.a`
 - [x] **Phase 5**: `secure_wipe_stack_rev.asm` → `libmysecure.a` (delegates to `memset_rev`)
 - [x] C test harness `test_link.c` — 8 functional tests, zero warnings, links `libmymem.a` + `libmysecure.a`
+- [x] **32-bit protected mode kernel** (`os/`): `entry.asm` (_start, BSS zero, IDT), `idt.asm` (256-entry IDT, vector 0x80 interrupt gate), `isr80.asm` (pusha/call dispatch), `syscall.h` (12 syscall numbers), `syscalls.c` (dispatch switch), `console.c/.h` (VGA 0xB8000 + PS/2 keyboard + COM1 tee), `kmain.c`, `user/shell.c` (interactive shell), `user/usys.S`/`usys.h` (int 0x80 wrappers)
+- [x] **`os/.gitignore`** — excluded all build artifacts (`.o`, `.bin`, `.elf`, `.img`)
+- [x] **Rebuild & test verification**: all components rebuilt, all tests pass, committed
 
 ## Current Structure
 
@@ -29,11 +47,14 @@ The template is a clean Next.js 16 starter with TypeScript and Tailwind CSS 4. I
 | `src/app/layout.tsx` | Root layout | ✅ Ready |
 | `src/app/globals.css` | Global styles | ✅ Ready |
 | `.kilocode/` | AI context & recipes | ✅ Ready |
-| `libmem/` | 32-bit x86 memory library (NASM + GCC -m32) | ✅ Built |
-| `boot/` | 16-bit BIOS boot sector (stage-1 loader) + custom 16-bit kernel (stage-2) | ✅ Built |
+| `libmem/` | 32-bit x86 memory library (NASM + GCC -m32) | ✅ Built, 10/10 tests pass |
+| `boot/` | 16-bit BIOS boot sector (stage-1 loader) + custom 16-bit kernel (stage-2) | ✅ Built, 6/6 tests pass in QEMU |
+| `os/` | 32-bit protected mode kernel + 12-syscall int 0x80 ABI + VGA console + PS/2 keyboard + userspace shell | ✅ Builds, stage1 stub incomplete (no PM switch) |
 
 | 2026-08-24 | Bootloaded restructured: modular 16-bit .asm files (memset/memzero/memset_rev/memzero_rev/secure_wipe) with global/extern directives, `%include`d into boot.asm; table-driven test runner with indirect `call word [bp+2]`; added edge-case tests (NULL + count==0); fixed BX corruption bug (switched table pointer to BP); all 6/6 tests PASS in QEMU, verified 512-byte size + 0xAA55 signature |
 | 2026-08-25 | Added custom 16-bit kernel (`boot/kernel.asm`): stage-2 kernel loaded by the bootloader at 0x8000. Implements a non-BIOS VGA-text kernel console (0xB8000) whose screen-clear uses `memzero16`; demos all 5 ported memory routines + NULL-safety + count==0 edge cases on a scratch buffer with a `buf_chk` verifier, printing `[OK]`/`[FAIL]`; chars also teed to serial 0x3F8 for `-nographic` observability. Bootloader trimmed to a 512-byte stage-1 loader (int 13h read + far-jmp; disk-error via BIOS teletype). `boot/Makefile` now builds `disk.img` (boot.bin + sector-padded kernel.bin) and computes `KERNEL_SECTORS` automatically. Verified 8/8 PASS in QEMU, zero warnings. |
+| 2026-08-25 | **32-bit protected-mode kernel** added (`os/`): 12-syscall ABI (`int 0x80` via `pusha`+`call` in `isr80.asm` → `syscall_dispatch` in `syscalls.c`), VGA text-mode console (`console.c`: 0xB8000 + PS/2 polled keyboard + COM1 serial tee), userside C shell (`shell.c`) with `xtoi`/`next_token` parser, `usys.S` int 0x80 wrappers, `link.ld` flat-binary at 0x100000, `stage1.asm` 16-bit stub (reads 1 sector into 0x8000). Kernel links & builds with 0 warnings. |
+| 2026-08-25 | **Repo hygiene**: added `os/.gitignore` excluding `.o`/`.bin`/`.elf`/`.img` build artifacts; removed 15 previously-tracked binary files from git; updated `BUILD_OUTPUT.log` with full rebuild & test verification log. All builds pass: libmem 10/10 tests, boot 6/6 QEMU, Next.js typecheck+lint clean. Committed as `81b94aa`. |
 
 ## Current Focus
 
@@ -129,6 +150,8 @@ export async function GET() {
 - [x] C test harness `test_suite.c` — 10-test comprehensive colour-coded harness
 - [x] **Epic colour-coded `README.md`** added to repo root covering both Next.js frontend and libmem assembly library
 - [x] **BIOS boot stack** (`boot/`) — stage-1 loader (`boot.asm`, 512-byte boot sector, `0xAA55`) reads the custom stage-2 kernel (`kernel.asm`) from sectors 2+ via BIOS `int 13h` into `0x8000` and far-jumps into it; the kernel owns a non-BIOS VGA-text console (cleared with `memzero16`) that demos all 5 ported memory routines + NULL-safety + count==0 edge cases and prints `[OK]`; **8/8 PASS** in QEMU, zero warnings
+- [x] **32-bit protected mode kernel** (`os/`) — 12-syscall `int 0x80` ABI (`isr80.asm` → `syscalls.c`), VGA 0xB8000 console + PS/2 keyboard + COM1 tee (`console.c`), userside shell (`shell.c`), linker script (`link.ld` at 0x100000), stage1 stub (`stage1.asm`)
+- [x] **Repo hygiene** — `os/.gitignore` added; removed 15 tracked binary artifacts from git; updated `BUILD_OUTPUT.log`
 
 ## Session History
 
@@ -138,3 +161,6 @@ export async function GET() {
 | 2026-08-24 | Built modular 32-bit x86 memory library (`libmem/`) across 5 phases: memset, memzero, memset_rev, memzero_rev, secure_wipe_stack_rev — assembled via NASM -f elf32, archived into `libmymem.a` + `libmysecure.a`, verified with C test harness (8 tests + 10-test colour-coded suite, zero warnings) |
 | 2026-08-24 | Created epic colour-coded `README.md` in repo root documenting both the Next.js 16 frontend stack and the libmem assembly library, including architecture diagrams, phase-by-phase build notes, DSE-prevention explanation, and full test results table |
 | 2026-08-24 | Bootloaded restructured: modular 16-bit .asm files (memset/memzero/memset_rev/memzero_rev/secure_wipe) with global/extern directives, %include'd into boot.asm; table-driven test runner with indirect `call word [bp+2]`; added edge-case tests (NULL + count==0); fixed BX corruption bug (switched table pointer to BP); all 6/6 tests PASS in QEMU, verified 512-byte size + 0xAA55 signature |
+| 2026-08-25 | Added custom 16-bit kernel (`boot/kernel.asm`): stage-2 kernel loaded by the bootloader at 0x8000. Implements a non-BIOS VGA-text kernel console (0xB8000) whose screen-clear uses `memzero16`; demos all 5 ported memory routines + NULL-safety + count==0 edge cases on a scratch buffer with a `buf_chk` verifier, printing `[OK]`/`[FAIL]`; chars also teed to serial 0x3F8 for `-nographic` observability. Bootloader trimmed to a 512-byte stage-1 loader (int 13h read + far-jmp; disk-error via BIOS teletype). `boot/Makefile` now builds `disk.img` (boot.bin + sector-padded kernel.bin) and computes `KERNEL_SECTORS` automatically. Verified 8/8 PASS in QEMU, zero warnings. |
+| 2026-08-25 | **32-bit protected-mode kernel** added (`os/`): 12-syscall ABI (`int 0x80` via `pusha`+`call` in `isr80.asm` → `syscall_dispatch` in `syscalls.c`), VGA text-mode console (`console.c`: 0xB8000 + PS/2 polled keyboard + COM1 serial tee), userside C shell (`shell.c`) with `xtoi`/`next_token` parser, `usys.S` int 0x80 wrappers, `link.ld` flat-binary at 0x100000, `stage1.asm` 16-bit stub (reads 1 sector into 0x8000). Kernel links & builds with 0 warnings. |
+| 2026-08-25 | **Repo hygiene**: added `os/.gitignore` excluding `.o`/`.bin`/`.elf`/`.img` build artifacts; removed 15 previously-tracked binary files from git; updated `BUILD_OUTPUT.log` with full rebuild & test verification log. All builds pass: libmem 10/10, boot 6/6 QEMU, Next.js typecheck+lint clean. Committed as `81b94aa`. |
