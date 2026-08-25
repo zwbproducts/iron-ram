@@ -1,3 +1,6 @@
 boot.bin
+kernel.bin
+kernel.pad
+disk.img
 *.lst
 boot
