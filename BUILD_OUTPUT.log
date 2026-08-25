@@ -1,5 +1,11 @@
-=== Build Output (make clean && make all) ===
+=== Build Output (rebuild & test) ===
+
+--- libmem/ ---
+$ make clean && make all && make test-suite
+
+make clean
 rm -f *.o *.a test_link test_suite
+make all
 nasm -f elf32 memset.asm -o memset.o
 nasm -f elf32 memzero.asm -o memzero.o
 nasm -f elf32 memset_rev.asm -o memset_rev.o
@@ -7,30 +13,76 @@ nasm -f elf32 memzero_rev.asm -o memzero_rev.o
 ar rcs libmymem.a memset.o memzero.o memset_rev.o memzero_rev.o
 nasm -f elf32 secure_wipe_stack_rev.asm -o secure_wipe_stack_rev.o
 ar rcs libmysecure.a secure_wipe_stack_rev.o
-
-=== Basic Test (make test) ===
-gcc -m32 -fno-builtin -fno-stack-protector -Wall -Wextra -std=c11 \
-	-o test_link test_link.c -L. -lmysecure -lmymem
-./test_link
-All 8 tests passed (libmymem.a + libmysecure.a)
-
-=== Comprehensive Test Suite (make test-suite) ===
+make test-suite
 gcc -m32 -fno-builtin -fno-stack-protector -Wall -Wextra -std=c11 \
 	-o test_suite test_suite.c -L. -lmysecure -lmymem
 ./test_suite
-[36m[1m========================================================
+========================================================
   libmem / libmysecure — Comprehensive Test Suite
 ========================================================
-[0m[33m  [TEST] [0mmemset forward fill              [32mPASS[0m
-[33m  [TEST] [0mmemset partial fill              [32mPASS[0m
-[33m  [TEST] [0mmemzero forward                  [32mPASS[0m
-[33m  [TEST] [0mmemset_rev backward fill         [32mPASS[0m
-[33m  [TEST] [0mmemzero_rev backward             [32mPASS[0m
-[33m  [TEST] [0msecure_wipe_stack_rev            [32mPASS[0m
-[33m  [TEST] [0mcount == 0 edge cases            [32mPASS[0m
-[33m  [TEST] [0mNULL dest safety                 [32mPASS[0m
-[33m  [TEST] [0mreturn value correctness         [32mPASS[0m
-[33m  [TEST] [0mmemset_rev partial fill          [32mPASS[0m
-[36m--------------------------------------------------------
-[0m[32m[1m  ALL 10 TESTS PASSED  (libmymem.a + libmysecure.a)
-[0m
+  [TEST] memset forward fill              PASS
+  [TEST] memset partial fill              PASS
+  [TEST] memzero forward                  PASS
+  [TEST] memset_rev backward fill         PASS
+  [TEST] memzero_rev backward             PASS
+  [TEST] secure_wipe_stack_rev            PASS
+  [TEST] count == 0 edge cases            PASS
+  [TEST] NULL dest safety                 PASS
+  [TEST] return value correctness         PASS
+  [TEST] memset_rev partial fill          PASS
+--------------------------------------------------------
+  ALL 10 TESTS PASSED  (libmymem.a + libmysecure.a)
+
+--- os/ ---
+$ make clean && make all
+nasm -f elf32 kernel/entry.asm -o kernel/entry.o
+nasm -f elf32 kernel/idt.asm -o kernel/idt.o
+nasm -f elf32 kernel/isr80.asm -o kernel/isr80.o
+gcc -m32 -ffreestanding -nostdlib -fno-pie -fno-stack-protector -Ikernel -c kernel/kmain.c -o kernel/kmain.o
+gcc -m32 -ffreestanding -nostdlib -fno-pie -fno-stack-protector -Ikernel -c kernel/console.c -o kernel/console.o
+gcc -m32 -ffreestanding -nostdlib -fno-pie -fno-stack-protector -Ikernel -c kernel/syscalls.c -o kernel/syscalls.o
+nasm -f elf32 ../libmem/memset.asm -o ../libmem/memset.o
+nasm -f elf32 ../libmem/memzero.asm -o ../libmem/memzero.o
+nasm -f elf32 ../libmem/memset_rev.asm -o ../libmem/memset_rev.o
+nasm -f elf32 ../libmem/memzero_rev.asm -o ../libmem/memzero_rev.o
+nasm -f elf32 ../libmem/secure_wipe_stack_rev.asm -o ../libmem/secure_wipe_stack_rev.o
+nasm -f elf32 user/usys.S -o user/usys.o
+gcc -m32 -ffreestanding -nostdlib -fno-pie -fno-stack-protector -Iuser -c user/shell.c -o user/shell.o
+ld -m elf_i386 -T kernel/link.ld -o kernel.elf ...
+objcopy -O binary kernel.elf kernel.bin
+kernel sectors=40
+dd if=/dev/zero of=disk.img bs=1024 count=1440
+dd if=stage1.bin of=disk.img conv=notrunc bs=512
+dd if=kernel.bin  of=disk.img conv=notrunc bs=512 seek=1
+[ BUILD OK — 0 warnings ]
+
+--- boot/ ---
+$ make clean && make
+nasm -f bin -o kernel.bin kernel.asm
+dd if=kernel.bin of=kernel.pad bs=512 conv=sync
+nasm -f bin -DKERNEL_SECTORS=2 boot.asm -o boot.bin   (512 bytes, verified)
+cat boot.bin kernel.pad > disk.img
+[ BUILD OK ]
+
+--- boot/ QEMU run ---
+  KERNEL CONSOLE (custom mem)
+  memsetw     : [OK]
+  memzero16   : [OK]
+  memset_rev16: [OK]
+  memzero_rev16: [OK]
+  secure_wipe16: [OK]
+  NULL safety : [OK]
+  count==0    : [OK]
+
+--- Next.js (root) ---
+$ bun typecheck
+tsc --noEmit       -> 0 errors
+$ bun lint
+eslint             -> 0 warnings
+
+
+=== Summary ===
+libmem    : BUILD OK, 10/10 tests PASS (0 warnings)
+os kernel : BUILD OK, 0 warnings
+boot/     : BUILD OK, 6/6 tests PASS in QEMU
+Next.js   : typecheck OK, lint OK

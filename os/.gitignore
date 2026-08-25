@@ -1,0 +1,11 @@
+/stage1.bin
+/kernel.bin
+/kernel.elf
+/big.img
+/small.img
+/test.img
+/disk.img
+/disk.img.*
+/*.o
+/kernel/*.o
+/user/*.o
