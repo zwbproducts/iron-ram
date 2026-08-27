@@ -1,0 +1,16 @@
+c[?7l[2J[0mSeaBIOS (version 1.15.0-1)
+
+
+iPXE (https://ipxe.org) 00:03.0 CA00 PCI2.10 PnP PMM+07F8B4A0+07ECB4A0 CA00
+Press Ctrl-B to configure iPXE (PCI 00:03.0)...                                                                               
+
+
+Booting from Hard Disk..
+  KERNEL C.
+ONSOLE (custom mem)
+  memsetw     : [OK]
+  memzero16   : [OK]
+  memset_rev16: [OK]
+  memzero_rev16: [OK]
+  secure_wipe16: [OK]
+ [FAIL]

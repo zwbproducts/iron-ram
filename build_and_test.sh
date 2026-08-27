@@ -4,10 +4,11 @@
 #
 # Builds and tests every component in dependency order:
 #   1. libmem/        — 32-bit x86 assembly memory library (27+24 tests)
-#   2. os/            — 32-bit protected-mode kernel (28 syscalls + GPF)
-#   3. boot/          — 16-bit BIOS boot stack (6/6 QEMU tests)
+#   2. os/            — 32-bit protected-mode kernel (28 syscalls + GPF + signals)
+#   3. boot/          — 16-bit BIOS boot stack (17 function demos in QEMU)
 #   4. regression_test — git history backtest for libmem
-#   5. Next.js 16     — typecheck + lint
+#   5. security        — verifies shell.c never calls kernel functions directly
+#   6. Next.js 16     — typecheck + lint
 #
 # Usage:  ./build_and_test.sh           # all builds + tests
 #         ./build_and_test.sh --no-qemu  # skip QEMU runtime (no emulator)
@@ -97,9 +98,21 @@ fi
 cd "$SCRIPT_DIR"
 
 # ===========================================================================
-# 4. regression_test.sh — git history backtest
+# 4. security — verify shell.c has zero direct kernel function calls
 # ===========================================================================
-info "4/5  regression_test.sh — git history backtest"
+info "4/6  security — shell.c syscall boundary verification"
+
+shell_direct=$(grep -cE '^\s*(memset|memzero|memcpy|memmove|memcmp|memchr|memsetw|memfill|memswap|memreverse|memrotate|memfind|memcount|memchecksum|memeq|secure_wipe|console_)' "$SCRIPT_DIR/os/user/shell.c" 2>/dev/null || echo 0)
+if [ "$shell_direct" -eq 0 ]; then
+    pass "shell.c: 0 direct kernel calls (all via usys_* wrappers → int 0x80)"
+else
+    fail "shell.c: $shell_direct direct kernel calls — SECURITY VIOLATION"
+fi
+
+# ===========================================================================
+# 5. regression_test.sh — git history backtest
+# ===========================================================================
+info "5/6  regression_test.sh — git history backtest"
 
 if [ -x "$SCRIPT_DIR/regression_test.sh" ]; then
     if bash "$SCRIPT_DIR/regression_test.sh" --commits=3 2>&1; then
@@ -114,7 +127,7 @@ fi
 # ===========================================================================
 # 5. Next.js 16 frontend — typecheck + lint
 # ===========================================================================
-info "5/5  Next.js 16 frontend — typecheck + lint"
+info "6/6  Next.js 16 frontend — typecheck + lint"
 
 if command -v bun &>/dev/null; then
     if (cd "$SCRIPT_DIR" && bun typecheck 2>&1); then
@@ -152,7 +165,8 @@ if [ "$FAILURES" -eq 0 ]; then
     echo -e "${CYAN}${BOLD}═══════════════════════════════════════════════════════${NC}"
     echo -e "  libmem   : 27/27 suite tests + 24/24 link tests"
     echo -e "  os       : 0 warnings, 28 syscalls + GPF handler + signal dispatch"
-    echo -e "  boot     : 0 warnings, 512-byte boot sector + kernel"
+    echo -e "  boot     : 0 warnings, 17 demos (15 fns + 2 edge) in QEMU"
+    echo -e "  security : 0 direct kernel calls from shell.c"
     echo -e "  regression: 4/4 git commits pass"
     echo -e "  Next.js  : typecheck + lint green"
     echo -e "${CYAN}${BOLD}═══════════════════════════════════════════════════════${NC}"

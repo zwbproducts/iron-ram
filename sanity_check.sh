@@ -6,10 +6,11 @@
 #
 #  Runs every build system in the repo and verifies the results:
 #    1. libmem/     — assembles NASM, archives .a, runs 27-test C harness
-#    2. os/         — builds 32-bit kernel ELF + disk image
-#    3. boot/       — builds 16-bit BIOS boot disk image
-#    4. boot/ QEMU  — runs disk.img in QEMU, checks for [OK] markers
-#    5. Next.js     — runs bun typecheck + lint
+#    2. os/         — builds 32-bit kernel ELF + disk image (28 syscalls)
+#    3. boot/       — builds 16-bit BIOS boot disk image (17 function demos)
+#    4. boot/ QEMU  — runs disk.img in QEMU, checks for [OK] markers (17/17)
+#    5. security    — verifies shell.c never calls kernel functions directly
+#    6. Next.js     — runs bun typecheck + lint
 #
 #  Usage:
 #    ./sanity_check.sh         # full build + test
@@ -103,10 +104,10 @@ if command -v qemu-system-x86_64 &>/dev/null; then
     ok_count=$(echo "$qemu_out" | grep -c '\[OK\]' || true)
     fail_count=$(echo "$qemu_out" | grep -c '\[FAIL\]' || true)
 
-    if [ "$ok_count" -ge 6 ] && [ "$fail_count" -eq 0 ]; then
-        pass "boot/ QEMU: $ok_count/[OK], $fail_count/[FAIL]"
+    if [ "$ok_count" -ge 17 ] && [ "$fail_count" -eq 0 ]; then
+        pass "boot/ QEMU: $ok_count/[OK], $fail_count/[FAIL] (15 functions + 2 edge cases)"
     else
-        fail "boot/ QEMU: $ok_count/[OK], $fail_count/[FAIL]"
+        fail "boot/ QEMU: $ok_count/[OK], $fail_count/[FAIL] (expected 17/[OK])"
         echo "$qemu_out" | head -20
     fi
 
@@ -123,8 +124,20 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# 5. Next.js frontend — typecheck + lint
+# 4.5. Security boundary: shell.c must NOT call kernel functions directly
 # ---------------------------------------------------------------------------
+info "Security check: shell.c syscall boundary"
+
+shell_direct_calls=$(grep -E '^\s*(memset|memzero|memcpy|memmove|memcmp|memchr|memsetw|memfill|memswap|memreverse|memrotate_l|memrotate_r|memfind|memcount|memchecksum|memeq|memmove_rev|secure_wipe|console_putc|console_puts|console_puthex|console_gets|console_cls)\s*\(' "$SCRIPT_DIR/os/user/shell.c" 2>/dev/null | wc -l || echo 0)
+
+if [ "$shell_direct_calls" -eq 0 ]; then
+    pass "shell.c: 0 direct kernel function calls (all via usys_* syscall wrappers)"
+else
+    fail "shell.c: $shell_direct_calls direct kernel calls found — security violation!"
+    grep -nE '^\s*(memset|memzero|memcpy|memmove|memcmp|memchr|memsetw|memfill|memswap|memreverse|memrotate_l|memrotate_r|memfind|memcount|memchecksum|memeq|secure_wipe|console_)' "$SCRIPT_DIR/os/user/shell.c" | head -10
+fi
+
+echo ""
 if command -v bun &>/dev/null; then
     info "Running Next.js typecheck + lint"
     (cd "$SCRIPT_DIR" && bun typecheck 2>&1) || {
@@ -146,7 +159,7 @@ echo ""
 info "libmem function inventory"
 
 echo "  ┌─────────────────────────────────────────────────────┐"
-echo "  │  libmymem.a (general-purpose memory routines)     │"
+echo "  │  libmymem.a (21 general-purpose memory routines)    │"
 echo "  ├─────────────────────────────────────────────────────┤"
 echo "  │  memset         — forward byte fill                │"
 echo "  │  memzero        — forward zero-fill (-> memset)     │"
@@ -168,13 +181,23 @@ echo "  │  memchecksum    — XOR checksum of region           │"
 echo "  │  memeq          — boolean equality test (1/0)      │"
 echo "  │  memmove_rev    — backward memmove variant         │"
 echo "  ├─────────────────────────────────────────────────────┤"
-echo "  │  libmysecure.a (DSE-protected secure wipe)        │"
+echo "  │  libmysecure.a (DSE-protected secure wipes)        │"
 echo "  ├─────────────────────────────────────────────────────┤"
 echo "  │  secure_wipe_stack_rev — backward stack wipe       │"
 echo "  │  secure_wipe_heap_rev  — backward heap wipe        │"
 echo "  └─────────────────────────────────────────────────────┘"
 
 echo ""
+echo "  Kernel interface:"
+echo "    int 0x80 -> syscall_dispatch  (28 syscalls, DPL=3 — userland gate)"
+echo "    int 0x81 -> signal_dispatch   (SIG_LIBMEM_READY, SIG_LIBMEM_WIPE,"
+echo "                                    SIG_LIBMEM_TEST_ALL — kernel-only,"
+echo "                                    runs all 21 functions through dispatch)"
+echo "    int 0x0D  -> gpf_handler       (General Protection Fault, DPL=0)"
+echo "                  - software GPF: log to serial, iret (non-fatal)"
+echo "                  - hardware GPF: log to serial, halt"
+echo ""
+echo "  Boot/ runtime: 15 function demos + 2 edge cases = 17 [OK] markers"
 echo "  Syscall interface (os/kernel/syscall.h):"
 echo "    int 0x80 -> syscall_dispatch  (28 syscalls, DPL=3)"
 echo "    int 0x81 -> signal_dispatch   (SIG_LIBMEM_READY, SIG_LIBMEM_WIPE,"

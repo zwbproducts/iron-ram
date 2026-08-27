@@ -31,6 +31,7 @@ extern void *memreverse(void *dest, unsigned long count);
 extern void *memrotate_l(void *dest, unsigned long shift, unsigned long count);
 extern void *memrotate_r(void *dest, unsigned long shift, unsigned long count);
 extern int   memfind(const void *s, int c, unsigned long count);
+extern int   memcount(const void *s, int c, unsigned long count);
 extern unsigned char memchecksum(const void *s, unsigned long count);
 extern int   memeq(const void *s1, const void *s2, unsigned long count);
 extern void *memmove_rev(void *dest, const void *src, unsigned long count);
