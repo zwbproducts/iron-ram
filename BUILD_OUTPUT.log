@@ -1,10 +1,12 @@
-=== Build Output (rebuild & test — Phase 2 expansion) ===
+=== Build Output (rebuild & test — Phase 3 expansion) ===
 
---- libmem/ (9 functions in libmymem.a, 2 in libmysecure.a) ---
+--- libmem/ (28 functions: 26 in libmymem.a, 2 in libmysecure.a) ---
+
 $ make clean && make all && make test-suite && make test
 
 make clean
 rm -f *.o *.a test_link test_suite
+
 make all
 nasm -f elf32 memset.asm -o memset.o
 nasm -f elf32 memzero.asm -o memzero.o
@@ -15,8 +17,20 @@ nasm -f elf32 memmove.asm -o memmove.o
 nasm -f elf32 memcmp.asm -o memcmp.o
 nasm -f elf32 memchr.asm -o memchr.o
 nasm -f elf32 memsetw.asm -o memsetw.o
+nasm -f elf32 memfill.asm -o memfill.o
+nasm -f elf32 memswap.asm -o memswap.o
+nasm -f elf32 memreverse.asm -o memreverse.o
+nasm -f elf32 memrotate_l.asm -o memrotate_l.o
+nasm -f elf32 memrotate_r.asm -o memrotate_r.o
+nasm -f elf32 memfind.asm -o memfind.o
+nasm -f elf32 memcount.asm -o memcount.o
+nasm -f elf32 memchecksum.asm -o memchecksum.o
+nasm -f elf32 memeq.asm -o memeq.o
+nasm -f elf32 memmove_rev.asm -o memmove_rev.o
 ar rcs libmymem.a memset.o memzero.o memset_rev.o memzero_rev.o \
-    memcpy.o memmove.o memcmp.o memchr.o memsetw.o
+    memcpy.o memmove.o memcmp.o memchr.o memsetw.o \
+    memfill.o memswap.o memreverse.o memrotate_l.o memrotate_r.o \
+    memfind.o memcount.o memchecksum.o memeq.o memmove_rev.o
 nasm -f elf32 secure_wipe_stack_rev.asm -o secure_wipe_stack_rev.o
 nasm -f elf32 secure_wipe_heap_rev.asm -o secure_wipe_heap_rev.o
 ar rcs libmysecure.a secure_wipe_stack_rev.o secure_wipe_heap_rev.o
@@ -45,37 +59,59 @@ gcc -m32 -fno-builtin -fno-stack-protector -Wall -Wextra -std=c11 \
   [TEST] memchr found & not-found         PASS
   [TEST] memsetw word fill                PASS
   [TEST] secure_wipe_heap_rev             PASS
+  [TEST] memfill pattern fill             PASS
+  [TEST] memswap two regions              PASS
+  [TEST] memreverse bytes                 PASS
+  [TEST] memrotate_l left                 PASS
+  [TEST] memrotate_r right                PASS
+  [TEST] memfind offset                   PASS
+  [TEST] memcount occurrences             PASS
+  [TEST] memchecksum XOR                  PASS
+  [TEST] memeq equality                   PASS
+  [TEST] memmove_rev backward             PASS
 --------------------------------------------------------
-  ALL 17 TESTS PASSED  (libmymem.a + libmysecure.a)
+  ALL 27 TESTS PASSED  (libmymem.a + libmysecure.a)
 
 make test
 gcc -m32 -fno-builtin -fno-stack-protector -Wall -Wextra -std=c11 \
     -o test_link test_link.c -L. -lmysecure -lmymem
 ./test_link
-All 14 tests passed (libmymem.a + libmysecure.a)
+All 24 tests passed (libmymem.a + libmysecure.a)
 
---- os/ (32-bit protected-mode kernel + 18 syscalls + signal interrupt) ---
+--- os/ (32-bit protected-mode kernel + 28 syscalls + signal interrupt + GPF handler) ---
+
 $ make clean && make all
 
 nasm -f elf32 kernel/entry.asm -o kernel/entry.o
-nasm -f elf32 kernel/idt.asm -o kernel/idt.o    (vector 0x80 + 0x81, DPL=3)
+nasm -f elf32 kernel/idt.asm -o kernel/idt.o    (vector 0x80 + 0x81 + 0x0D, DPL=3/3/0)
 nasm -f elf32 kernel/isr80.asm -o kernel/isr80.o
-nasm -f elf32 kernel/isr81.asm -o kernel/isr81.o  (NEW: signal handler)
+nasm -f elf32 kernel/isr81.asm -o kernel/isr81.o  (signal handler: int 0x81)
+nasm -f elf32 kernel/isr_gpf.asm -o kernel/isr_gpf.o  (NEW: GPF handler, vector 0x0D)
 gcc  -m32 -ffreestanding -nostdlib -fno-pie -fno-stack-protector -Ikernel \
-     -c kernel/kmain.c -o kernel/kmain.o   (calls libmem_signal via int 0x81)
+     -c kernel/kmain.c -o kernel/kmain.o  (triggers SIG_LIBMEM_READY + SIG_LIBMEM_TEST_ALL)
 gcc  -m32 ... -c kernel/console.c -o kernel/console.o
-gcc  -m32 ... -c kernel/syscalls.c -o kernel/syscalls.o  (18 dispatch cases)
-nasm -f elf32 ... 12 libmem .asm files (9 in libmymem + 2 in libmysecure + memset_rev)
-nasm -f elf32 user/usys.S -o user/usys.o   (18 syscall wrappers)
-gcc  -m32 ... -c user/shell.c -o user/shell.o   (12 commands)
+gcc  -m32 ... -c kernel/syscalls.c -o kernel/syscalls.o  (28 dispatch cases + signal_dispatch + GPF-aware)
+nasm -f elf32 ... 18 libmem .asm files (16 in libmymem + 2 in libmysecure)
+nasm -f elf32 user/usys.S -o user/usys.o   (28 syscall wrappers, SYS 1-28)
+gcc  -m32 ... -c user/shell.o   (28 commands in shell)
 ld -m elf_i386 -T kernel/link.ld -o kernel.elf ...
 objcopy -O binary kernel.elf kernel.bin
-kernel sectors=45
+kernel sectors=55
 dd if=stage1.bin of=disk.img conv=notrunc bs=512
 dd if=kernel.bin  of=disk.img conv=notrunc bs=512 seek=1
-[ BUILD OK — 0 warnings ]
+[ BUILD OK — 0 warnings, 0 errors ]
+
+--- regression_test.sh (git history backtest) ---
+
+$ ./regression_test.sh --commits=3
+  Working tree  PASS (24 tests via test_link)
+  fd65ff8       PASS (8 tests via test_link)
+  622a776       PASS (8 tests via test_link)
+  ca635b7       PASS (14 tests via test_link)
+  PASSED: 4  FAILED: 0  SKIPPED: 0
 
 --- boot/ (16-bit BIOS boot stack) ---
+
 $ make clean && make all
 nasm -f bin kernel.asm -o kernel.bin
 dd if=kernel.bin of=kernel.pad bs=512 conv=sync
@@ -94,7 +130,7 @@ cat boot.bin kernel.pad > disk.img
   count==0    : [OK]
 
 --- sanity_check.sh ---
-./sanity_check.sh → ALL CHECKS PASSED (libmem 17/17, os build 0 warnings, boot build OK, Next.js OK)
+./sanity_check.sh → ALL CHECKS PASSED (libmem 27/27, os build 0 warnings, boot build OK)
 
 --- Next.js (root) ---
 $ bun typecheck
@@ -104,8 +140,9 @@ eslint              → 0 warnings
 
 
 === Summary ===
-libmem          : BUILD OK, 17/17 tests PASS (0 warnings)
-os kernel       : BUILD OK, 0 warnings, 18 syscalls + signal interrupt
-boot/           : BUILD OK, 6/6 + edge cases PASS in QEMU
-Next.js         : typecheck OK, lint OK
-sanity_check.sh : ALL CHECKS PASSED
+libmem       : BUILD OK, 27/27 tests PASS (0 warnings)
+libmysecure  : 24/24 tests PASS via test_link
+os kernel    : BUILD OK, 0 warnings, 28 syscalls + signal(int 0x81) + GPF(int 0x0D) handler
+boot/        : BUILD OK, 6/6 + edge cases PASS in QEMU
+regression   : 4/4 historical commits PASS
+Next.js      : typecheck OK, lint OK

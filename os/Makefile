@@ -12,12 +12,16 @@ LD      = ld -m elf_i386
 
 LIBMEM = ../libmem
 
-KOBJS = kernel/entry.o kernel/idt.o kernel/isr80.o kernel/isr81.o \
+KOBJS = kernel/entry.o kernel/idt.o kernel/isr80.o kernel/isr81.o kernel/isr_gpf.o \
         kernel/kmain.o kernel/console.o kernel/syscalls.o \
         $(LIBMEM)/memset.o $(LIBMEM)/memzero.o \
         $(LIBMEM)/memset_rev.o $(LIBMEM)/memzero_rev.o \
         $(LIBMEM)/memcpy.o $(LIBMEM)/memmove.o \
         $(LIBMEM)/memcmp.o $(LIBMEM)/memchr.o $(LIBMEM)/memsetw.o \
+        $(LIBMEM)/memfill.o $(LIBMEM)/memswap.o $(LIBMEM)/memreverse.o \
+        $(LIBMEM)/memrotate_l.o $(LIBMEM)/memrotate_r.o \
+        $(LIBMEM)/memfind.o $(LIBMEM)/memcount.o \
+        $(LIBMEM)/memchecksum.o $(LIBMEM)/memeq.o $(LIBMEM)/memmove_rev.o \
         $(LIBMEM)/secure_wipe_stack_rev.o $(LIBMEM)/secure_wipe_heap_rev.o \
         user/usys.o user/shell.o
 
@@ -56,7 +60,7 @@ define LIBMEM_RULE
 $(LIBMEM)/$(1).o: $(LIBMEM)/$(1).asm
 	$$(NASMF32) $$< -o $$@
 endef
-$(foreach f,memset memzero memset_rev memzero_rev memcpy memmove memcmp memchr memsetw secure_wipe_stack_rev secure_wipe_heap_rev,\
+$(foreach f,memset memzero memset_rev memzero_rev memcpy memmove memcmp memchr memsetw memfill memswap memreverse memrotate_l memrotate_r memfind memcount memchecksum memeq memmove_rev secure_wipe_stack_rev secure_wipe_heap_rev,\
 	$(eval $(call LIBMEM_RULE,$(f))))
 
 clean:

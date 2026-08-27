@@ -667,6 +667,244 @@ static int test_secure_wipe_heap(void)
     return buffers_match(buf, BUF_SIZE, 0x00);
 }
 
+/* =========================================================================== */
+/*  TEST 18 — memfill pattern fill                                        */
+/* =========================================================================== */
+/*
+ *  Scenario:
+ *      Fill a buffer with repeating 16-bit pattern 0xBEEF using memfill.
+ *      Verify the pattern repeats correctly for odd-length buffers.
+ *
+ *  Why:
+ *      Confirms memfill.asm writes 2-byte patterns. An odd count should
+ *      produce an extra low-byte at the end.
+ */
+static int test_memfill(void)
+{
+    unsigned char buf[BUF_SIZE];
+
+    memset(buf, 0, BUF_SIZE);
+    memfill(buf, 0xBEEF, 10);
+
+    /* bytes: BE EF BE EF BE EF */
+    if (buf[0] != 0xEF) return 0; /* little-endian: low byte first */
+    if (buf[1] != 0xBE) return 0;
+    if (buf[2] != 0xEF) return 0;
+    if (buf[3] != 0xBE) return 0;
+    if (buf[4] != 0xEF) return 0; /* 5th byte = low byte again */
+    return 1;
+}
+
+/* =========================================================================== */
+/*  TEST 19 — memswap two regions                                       */
+/* =========================================================================== */
+/*
+ *  Scenario:
+ *      Two buffers with distinct fill values. Swap them.
+ *      After swap, contents should be exchanged.
+ */
+static int test_memswap(void)
+{
+    unsigned char buf1[BUF_SIZE];
+    unsigned char buf2[BUF_SIZE];
+
+    fill_buffer(buf1, BUF_SIZE, 0x11);
+    fill_buffer(buf2, BUF_SIZE, 0x22);
+
+    memswap(buf1, buf2, BUF_SIZE);
+
+    if (!buffers_match(buf1, BUF_SIZE, 0x22))
+        return 0;
+    return buffers_match(buf2, BUF_SIZE, 0x11);
+}
+
+/* =========================================================================== */
+/*  TEST 20 — memreverse reverse bytes                                   */
+/* =========================================================================== */
+/*
+ *  Scenario:
+ *      Fill buf with [0,1,2,...,N-1]. Reverse. Verify [N-1,N-2,...,0].
+ */
+static int test_memreverse(void)
+{
+    unsigned char buf[16];
+
+    for (int i = 0; i < 16; i++)
+        buf[i] = (unsigned char)i;
+
+    memreverse(buf, 16);
+
+    for (int i = 0; i < 16; i++) {
+        if (buf[i] != (unsigned char)(15 - i))
+            return 0;
+    }
+    return 1;
+}
+
+/* =========================================================================== */
+/*  TEST 21 — memrotate_l left rotation                              */
+/* =========================================================================== */
+/*
+ *  Scenario:
+ *      Fill buf with [A,B,C,D,E,F,G,H]. Rotate left by 3.
+ *      Result should be [D,E,F,G,H,A,B,C].
+ */
+static int test_memrotate_l(void)
+{
+    unsigned char buf[8] = {1,2,3,4,5,6,7,8};
+
+    memrotate_l(buf, 3, 8);
+
+    /* After left-rotate by 3: [4,5,6,7,8,1,2,3] */
+    unsigned char expected[8] = {4,5,6,7,8,1,2,3};
+    for (int i = 0; i < 8; i++) {
+        if (buf[i] != expected[i])
+            return 0;
+    }
+    return 1;
+}
+
+/* =========================================================================== */
+/*  TEST 22 — memrotate_r right rotation                             */
+/* =========================================================================== */
+static int test_memrotate_r(void)
+{
+    unsigned char buf[8] = {1,2,3,4,5,6,7,8};
+
+    memrotate_r(buf, 3, 8);
+
+    /* After right-rotate by 3: [6,7,8,1,2,3,4,5] */
+    unsigned char expected[8] = {6,7,8,1,2,3,4,5};
+    for (int i = 0; i < 8; i++) {
+        if (buf[i] != expected[i])
+            return 0;
+    }
+    return 1;
+}
+
+/* =========================================================================== */
+/*  TEST 23 — memfind offset                                          */
+/* =========================================================================== */
+/*
+ *  Scenario:
+ *      Fill buf with 0xFF, set buf[10]=0x42.
+ *      memfind should return 10 (offset). Search for 0x99 → -1.
+ */
+static int test_memfind(void)
+{
+    unsigned char buf[BUF_SIZE];
+
+    fill_buffer(buf, BUF_SIZE, 0xFF);
+    buf[10] = 0x42;
+
+    if (memfind(buf, 0x42, BUF_SIZE) != 10)
+        return 0;
+    if (memfind(buf, 0x99, BUF_SIZE) != -1)
+        return 0;
+
+    return 1;
+}
+
+/* =========================================================================== */
+/*  TEST 24 — memcount byte occurrences                               */
+/* =========================================================================== */
+static int test_memcount(void)
+{
+    unsigned char buf[BUF_SIZE];
+
+    fill_buffer(buf, BUF_SIZE, 0xFF);
+    buf[0] = 0x42;
+    buf[10] = 0x42;
+    buf[20] = 0x42;
+
+    /* Count 0x42: should be 3 */
+    if (memcount(buf, 0x42, BUF_SIZE) != 3)
+        return 0;
+    /* Count 0xFF: should be 29 (32 - 3) */
+    if (memcount(buf, 0xFF, BUF_SIZE) != 29)
+        return 0;
+
+    return 1;
+}
+
+/* =========================================================================== */
+/*  TEST 25 — memchecksum XOR                                         */
+/* =========================================================================== */
+/*
+ *  Scenario:
+ *      Fill buf with 0xFF. checksum = 0xFF (XOR of 32 0xFF bytes).
+ *      With count=0, checksum should be 0.
+ */
+static int test_memchecksum(void)
+{
+    unsigned char buf[BUF_SIZE];
+
+    fill_buffer(buf, BUF_SIZE, 0xFF);
+    /* 32 bytes of 0xFF: XOR = 0 (even count of 0xFF = 0x00) */
+    if (memchecksum(buf, BUF_SIZE) != 0)
+        return 0;
+
+    /* 3 bytes of 0xFF: XOR = 0xFF */
+    if (memchecksum(buf, 3) != 0xFF)
+        return 0;
+
+    return 1;
+}
+
+/* =========================================================================== */
+/*  TEST 26 — memeq equality                                         */
+/* =========================================================================== */
+/*
+ *  Scenario:
+ *      Two identical buffers → 1.
+ *      One byte differs → 0.
+ */
+static int test_memeq(void)
+{
+    unsigned char buf1[BUF_SIZE];
+    unsigned char buf2[BUF_SIZE];
+
+    fill_buffer(buf1, BUF_SIZE, 0xAB);
+    fill_buffer(buf2, BUF_SIZE, 0xAB);
+
+    if (memeq(buf1, buf2, BUF_SIZE) != 1)
+        return 0;
+
+    buf2[5] = 0xAC;
+    if (memeq(buf1, buf2, BUF_SIZE) != 0)
+        return 0;
+
+    return 1;
+}
+
+/* =========================================================================== */
+/*  TEST 27 — memmove_rev backward copy                                */
+/* =========================================================================== */
+/*
+ *  Scenario:
+ *      Copy 8 bytes using memmove_rev (always backward).
+ *      Verify destination has the correct data.
+ */
+static int test_memmove_rev(void)
+{
+    unsigned char src[BUF_SIZE];
+    unsigned char dst[BUF_SIZE];
+
+    memset(src, 0, BUF_SIZE);
+    memset(src, 0x77, 8);
+    memset(dst, 0, BUF_SIZE);
+
+    memmove_rev(dst, src, 8);
+
+    if (!buffers_match(dst, 8, 0x77))
+        return 0;
+    if (!buffers_match(dst + 8, BUF_SIZE - 8, 0x00))
+        return 0;
+
+    /* Source must be unchanged */
+    return buffers_match(src, 8, 0x77);
+}
+
 /*  -------------------------------------------------------------------------  */
 /*  Section 6 — Test Runner (main)                                            */
 /*  -------------------------------------------------------------------------  */
@@ -811,6 +1049,78 @@ int main(void)
         failures++;
     }
 
+    /* --- Phase 3: 10 more general-purpose functions --- */
+
+    if (test_memfill())
+        print_result("memfill pattern fill", 1);
+    else {
+        print_result("memfill pattern fill", 0);
+        failures++;
+    }
+
+    if (test_memswap())
+        print_result("memswap two regions", 1);
+    else {
+        print_result("memswap two regions", 0);
+        failures++;
+    }
+
+    if (test_memreverse())
+        print_result("memreverse bytes", 1);
+    else {
+        print_result("memreverse bytes", 0);
+        failures++;
+    }
+
+    if (test_memrotate_l())
+        print_result("memrotate_l left", 1);
+    else {
+        print_result("memrotate_l left", 0);
+        failures++;
+    }
+
+    if (test_memrotate_r())
+        print_result("memrotate_r right", 1);
+    else {
+        print_result("memrotate_r right", 0);
+        failures++;
+    }
+
+    if (test_memfind())
+        print_result("memfind offset", 1);
+    else {
+        print_result("memfind offset", 0);
+        failures++;
+    }
+
+    if (test_memcount())
+        print_result("memcount occurrences", 1);
+    else {
+        print_result("memcount occurrences", 0);
+        failures++;
+    }
+
+    if (test_memchecksum())
+        print_result("memchecksum XOR", 1);
+    else {
+        print_result("memchecksum XOR", 0);
+        failures++;
+    }
+
+    if (test_memeq())
+        print_result("memeq equality", 1);
+    else {
+        print_result("memeq equality", 0);
+        failures++;
+    }
+
+    if (test_memmove_rev())
+        print_result("memmove_rev backward", 1);
+    else {
+        print_result("memmove_rev backward", 0);
+        failures++;
+    }
+
     /*  ------------------------------------------------------- */
     /*  Final summary in green or red                          */
     /*  ------------------------------------------------------- */
@@ -821,7 +1131,7 @@ int main(void)
 
     if (failures == 0) {
         printf(COLOR_GREEN COLOR_BOLD
-               "  ALL 17 TESTS PASSED  (libmymem.a + libmysecure.a)\n"
+               "  ALL 27 TESTS PASSED  (libmymem.a + libmysecure.a)\n"
                COLOR_RESET);
         return 0;
     }

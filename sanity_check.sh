@@ -5,7 +5,7 @@
 # =============================================================================
 #
 #  Runs every build system in the repo and verifies the results:
-#    1. libmem/     — assembles NASM, archives .a, runs 17-test C harness
+#    1. libmem/     — assembles NASM, archives .a, runs 27-test C harness
 #    2. os/         — builds 32-bit kernel ELF + disk image
 #    3. boot/       — builds 16-bit BIOS boot disk image
 #    4. boot/ QEMU  — runs disk.img in QEMU, checks for [OK] markers
@@ -48,7 +48,7 @@ if command -v make &>/dev/null; then
     (cd "$SCRIPT_DIR/libmem" && make test-suite 2>&1) || {
         fail "libmem test-suite failed"
     }
-    pass "libmem/ built + 17 tests verified"
+    pass "libmem/ built + 27 tests verified"
 else
     warn "make not available in this environment"
     fail "libmem build requires make"
@@ -149,14 +149,24 @@ echo "  ┌───────────────────────
 echo "  │  libmymem.a (general-purpose memory routines)     │"
 echo "  ├─────────────────────────────────────────────────────┤"
 echo "  │  memset         — forward byte fill                │"
-echo "  │  memzero        — forward zero-fill (→ memset)     │"
+echo "  │  memzero        — forward zero-fill (-> memset)     │"
 echo "  │  memset_rev     — backward byte fill               │"
-echo "  │  memzero_rev    — backward zero-fill (→ memset_rev)│"
+echo "  │  memzero_rev    — backward zero-fill (-> memset_rev)│"
 echo "  │  memcpy         — forward byte copy (no overlap)   │"
 echo "  │  memmove        — overlapping-safe copy           │"
 echo "  │  memcmp         — compare two memory regions       │"
 echo "  │  memchr         — find byte in memory              │"
 echo "  │  memsetw        — forward 16-bit word fill         │"
+echo "  │  memfill        — repeating 16-bit pattern fill     │"
+echo "  │  memswap        — swap two memory regions          │"
+echo "  │  memreverse     — reverse bytes in region          │"
+echo "  │  memrotate_l    — left rotation by N bytes         │"
+echo "  │  memrotate_r    — right rotation by N bytes        │"
+echo "  │  memfind        — find byte, return offset         │"
+echo "  │  memcount       — count byte occurrences           │"
+echo "  │  memchecksum    — XOR checksum of region           │"
+echo "  │  memeq          — boolean equality test (1/0)      │"
+echo "  │  memmove_rev    — backward memmove variant         │"
 echo "  ├─────────────────────────────────────────────────────┤"
 echo "  │  libmysecure.a (DSE-protected secure wipe)        │"
 echo "  ├─────────────────────────────────────────────────────┤"
@@ -166,8 +176,13 @@ echo "  └───────────────────────
 
 echo ""
 echo "  Syscall interface (os/kernel/syscall.h):"
-echo "    int 0x80 → syscall_dispatch  (18 syscalls, DPL=3)"
-echo "    int 0x81 → signal_dispatch   (SIG_LIBMEM_READY, SIG_LIBMEM_WIPE)"
+echo "    int 0x80 -> syscall_dispatch  (28 syscalls, DPL=3)"
+echo "    int 0x81 -> signal_dispatch   (SIG_LIBMEM_READY, SIG_LIBMEM_WIPE,"
+echo "                                    SIG_LIBMEM_TEST_ALL — runs all 21 functions"
+echo "                                    through kernel dispatch with GPF exception handling)"
+echo "    int 0x0D  -> gpf_handler       (General Protection Fault, DPL=0)"
+echo "                  - software GPF: log to serial, iret (non-fatal)"
+echo "                  - hardware GPF: log to serial, halt"
 
 echo ""
 

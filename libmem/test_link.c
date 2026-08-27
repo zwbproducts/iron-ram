@@ -146,6 +146,94 @@ static int test_secure_wipe_heap(void)
     return buffers_match(buf, BUF_SIZE, 0x00);
 }
 
+static int test_memfill(void)
+{
+    unsigned char buf[BUF_SIZE];
+    memset(buf, 0, BUF_SIZE);
+    memfill(buf, 0xBEEF, 6);
+    return buf[0] == 0xEF && buf[1] == 0xBE && buf[2] == 0xEF && buf[3] == 0xBE;
+}
+
+static int test_memswap(void)
+{
+    unsigned char b1[BUF_SIZE], b2[BUF_SIZE];
+    fill_buffer(b1, BUF_SIZE, 0x11);
+    fill_buffer(b2, BUF_SIZE, 0x22);
+    memswap(b1, b2, BUF_SIZE);
+    return buffers_match(b1, BUF_SIZE, 0x22) && buffers_match(b2, BUF_SIZE, 0x11);
+}
+
+static int test_memreverse(void)
+{
+    unsigned char buf[16];
+    for (int i = 0; i < 16; i++) buf[i] = (unsigned char)i;
+    memreverse(buf, 16);
+    for (int i = 0; i < 16; i++)
+        if (buf[i] != (unsigned char)(15 - i)) return 0;
+    return 1;
+}
+
+static int test_memrotate_l(void)
+{
+    unsigned char buf[8] = {1,2,3,4,5,6,7,8};
+    unsigned char exp[8] = {4,5,6,7,8,1,2,3};
+    memrotate_l(buf, 3, 8);
+    for (int i = 0; i < 8; i++) if (buf[i] != exp[i]) return 0;
+    return 1;
+}
+
+static int test_memrotate_r(void)
+{
+    unsigned char buf[8] = {1,2,3,4,5,6,7,8};
+    unsigned char exp[8] = {6,7,8,1,2,3,4,5};
+    memrotate_r(buf, 3, 8);
+    for (int i = 0; i < 8; i++) if (buf[i] != exp[i]) return 0;
+    return 1;
+}
+
+static int test_memfind(void)
+{
+    unsigned char buf[BUF_SIZE];
+    fill_buffer(buf, BUF_SIZE, 0xFF);
+    buf[10] = 0x42;
+    return memfind(buf, 0x42, BUF_SIZE) == 10 && memfind(buf, 0x99, BUF_SIZE) == -1;
+}
+
+static int test_memcount(void)
+{
+    unsigned char buf[BUF_SIZE];
+    fill_buffer(buf, BUF_SIZE, 0xFF);
+    buf[0] = 0x42; buf[10] = 0x42; buf[20] = 0x42;
+    return memcount(buf, 0x42, BUF_SIZE) == 3;
+}
+
+static int test_memchecksum(void)
+{
+    unsigned char buf[BUF_SIZE];
+    fill_buffer(buf, BUF_SIZE, 0xFF);
+    return memchecksum(buf, BUF_SIZE) == 0;
+}
+
+static int test_memeq(void)
+{
+    unsigned char b1[BUF_SIZE], b2[BUF_SIZE];
+    fill_buffer(b1, BUF_SIZE, 0xAB);
+    fill_buffer(b2, BUF_SIZE, 0xAB);
+    if (memeq(b1, b2, BUF_SIZE) != 1) return 0;
+    b2[5] = 0xAC;
+    return memeq(b1, b2, BUF_SIZE) == 0;
+}
+
+static int test_memmove_rev(void)
+{
+    unsigned char src[BUF_SIZE], dst[BUF_SIZE];
+    memset(src, 0, BUF_SIZE);
+    memset(src, 0x77, 8);
+    memset(dst, 0, BUF_SIZE);
+    memmove_rev(dst, src, 8);
+    return buffers_match(dst, 8, 0x77) && buffers_match(src, 8, 0x77);
+}
+
 static int test_count_zero(void)
 {
     unsigned char buf[BUF_SIZE];
@@ -274,9 +362,49 @@ int main(void)
         printf("FAIL: secure_wipe_heap_rev\n");
         failures++;
     }
+    if (!test_memfill()) {
+        printf("FAIL: memfill\n");
+        failures++;
+    }
+    if (!test_memswap()) {
+        printf("FAIL: memswap\n");
+        failures++;
+    }
+    if (!test_memreverse()) {
+        printf("FAIL: memreverse\n");
+        failures++;
+    }
+    if (!test_memrotate_l()) {
+        printf("FAIL: memrotate_l\n");
+        failures++;
+    }
+    if (!test_memrotate_r()) {
+        printf("FAIL: memrotate_r\n");
+        failures++;
+    }
+    if (!test_memfind()) {
+        printf("FAIL: memfind\n");
+        failures++;
+    }
+    if (!test_memcount()) {
+        printf("FAIL: memcount\n");
+        failures++;
+    }
+    if (!test_memchecksum()) {
+        printf("FAIL: memchecksum\n");
+        failures++;
+    }
+    if (!test_memeq()) {
+        printf("FAIL: memeq\n");
+        failures++;
+    }
+    if (!test_memmove_rev()) {
+        printf("FAIL: memmove_rev\n");
+        failures++;
+    }
 
     if (failures == 0) {
-        printf("All 14 tests passed (libmymem.a + libmysecure.a)\n");
+        printf("All 24 tests passed (libmymem.a + libmysecure.a)\n");
         return 0;
     }
 

@@ -7,7 +7,10 @@ ASMFLAGS = -f elf32
 AR = ar
 ARFLAGS = rcs
 
-LIBMEM_OBJS = memset.o memzero.o memset_rev.o memzero_rev.o memcpy.o memmove.o memcmp.o memchr.o memsetw.o
+LIBMEM_OBJS = memset.o memzero.o memset_rev.o memzero_rev.o memcpy.o memmove.o \
+              memcmp.o memchr.o memsetw.o memfill.o memswap.o memreverse.o \
+              memrotate_l.o memrotate_r.o memfind.o memcount.o \
+              memchecksum.o memeq.o memmove_rev.o
 LIBSECURE_OBJS = secure_wipe_stack_rev.o secure_wipe_heap_rev.o
 
 .PHONY: all clean test test-suite

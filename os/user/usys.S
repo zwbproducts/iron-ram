@@ -6,12 +6,16 @@ global syscall
 global usys_memset, usys_memzero, usys_memset_rev, usys_memzero_rev
 global usys_secure_wipe, usys_cls, usys_putc, usys_puts, usys_puthex
 global usys_memcpy, usys_memmove, usys_memcmp, usys_memchr, usys_memsetw
-global usys_secure_wipe_heap, usys_peek, usys_gets, usys_halt
+global usys_memfill, usys_memswap, usys_memreverse, usys_memrotate_l
+global usys_memrotate_r, usys_memfind, usys_memcount, usys_memchecksum
+global usys_memeq, usys_memmove_rev, usys_secure_wipe_heap
+global usys_peek, usys_gets, usys_halt
 
 syscall:
     int 0x80
     ret
 
+; --- original 12 syscalls ---
 usys_memset:
     mov eax, 1
     int 0x80
@@ -72,8 +76,7 @@ usys_halt:
     int 0x80
     ret
 
-; --- Phase 2 expansion: new libmem syscalls ---
-
+; --- Phase 2: new libmem syscalls (13-18) ---
 usys_memcpy:
     mov eax, 13
     int 0x80
@@ -101,5 +104,56 @@ usys_memsetw:
 
 usys_secure_wipe_heap:
     mov eax, 18
+    int 0x80
+    ret
+
+; --- Phase 3: 10 more functions (19-28) ---
+usys_memfill:
+    mov eax, 19
+    int 0x80
+    ret
+
+usys_memswap:
+    mov eax, 20
+    int 0x80
+    ret
+
+usys_memreverse:
+    mov eax, 21
+    int 0x80
+    ret
+
+usys_memrotate_l:
+    mov eax, 22
+    int 0x80
+    ret
+
+usys_memrotate_r:
+    mov eax, 23
+    int 0x80
+    ret
+
+usys_memfind:
+    mov eax, 24
+    int 0x80
+    ret
+
+usys_memcount:
+    mov eax, 25
+    int 0x80
+    ret
+
+usys_memchecksum:
+    mov eax, 26
+    int 0x80
+    ret
+
+usys_memeq:
+    mov eax, 27
+    int 0x80
+    ret
+
+usys_memmove_rev:
+    mov eax, 28
     int 0x80
     ret
