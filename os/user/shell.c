@@ -53,8 +53,12 @@ void shell_main(void) {
         if (!cmd || !cmd[0]) { usys_puts("> "); continue; }
 
         if (streq(cmd, "help")) {
-            usys_puts("memset <a> <b> <n>  memzero <a> <n>  memset_rev <a> <b> <n>\r\n"
-                      "memzero_rev <a> <n>  secure_wipe <a> <n>\r\n"
+            usys_puts("memset <a> <b> <n>    memzero <a> <n>\r\n"
+                      "memset_rev <a> <b> <n>  memzero_rev <a> <n>\r\n"
+                      "memcpy <dst> <src> <n>  memmove <dst> <src> <n>\r\n"
+                      "memcmp <a> <b> <n>      memchr <a> <byte> <n>\r\n"
+                      "memsetw <a> <word> <n>  secure_wipe <a> <n>\r\n"
+                      "secure_wipe_heap <a> <n>\r\n"
                       "peek <a>  cls  halt\r\n");
         } else if (streq(cmd, "cls")) {
             usys_cls();
@@ -84,10 +88,40 @@ void shell_main(void) {
             if (!a||!n) { usys_puts("memzero_rev <addr> <count>\r\n"); goto again; }
             unsigned long r = (unsigned long)usys_memzero_rev((void*)xtoi(a), (unsigned int)xtoi(n));
             usys_puthex(r); goto again;
+        } else if (streq(cmd, "memcpy")) {
+            char *d = next_token(&s); char *sr = next_token(&s); char *n = next_token(&s);
+            if (!d||!sr||!n) { usys_puts("memcpy <dst> <src> <n>\r\n"); goto again; }
+            unsigned long r = (unsigned long)usys_memcpy((void*)xtoi(d), (const void*)xtoi(sr), (unsigned int)xtoi(n));
+            usys_puthex(r); goto again;
+        } else if (streq(cmd, "memmove")) {
+            char *d = next_token(&s); char *sr = next_token(&s); char *n = next_token(&s);
+            if (!d||!sr||!n) { usys_puts("memmove <dst> <src> <n>\r\n"); goto again; }
+            unsigned long r = (unsigned long)usys_memmove((void*)xtoi(d), (const void*)xtoi(sr), (unsigned int)xtoi(n));
+            usys_puthex(r); goto again;
+        } else if (streq(cmd, "memcmp")) {
+            char *a = next_token(&s); char *b = next_token(&s); char *n = next_token(&s);
+            if (!a||!b||!n) { usys_puts("memcmp <a> <b> <n>\r\n"); goto again; }
+            int r = usys_memcmp((const void*)xtoi(a), (const void*)xtoi(b), (unsigned int)xtoi(n));
+            usys_puts("cmp="); usys_puthex((unsigned long)r); usys_puts("\r\n"); goto again;
+        } else if (streq(cmd, "memchr")) {
+            char *a = next_token(&s); char *b = next_token(&s); char *n = next_token(&s);
+            if (!a||!b||!n) { usys_puts("memchr <addr> <byte> <n>\r\n"); goto again; }
+            unsigned long r = (unsigned long)usys_memchr((const void*)xtoi(a), (int)xtoi(b), (unsigned int)xtoi(n));
+            usys_puts("found at 0x"); usys_puthex(r); usys_puts("\r\n"); goto again;
+        } else if (streq(cmd, "memsetw")) {
+            char *a = next_token(&s); char *w = next_token(&s); char *n = next_token(&s);
+            if (!a||!w||!n) { usys_puts("memsetw <addr> <word> <n>\r\n"); goto again; }
+            unsigned long r = (unsigned long)usys_memsetw((void*)xtoi(a), (unsigned short)xtoi(w), (unsigned int)xtoi(n));
+            usys_puthex(r); goto again;
         } else if (streq(cmd, "secure_wipe")) {
             char *a = next_token(&s); char *n = next_token(&s);
             if (!a||!n) { usys_puts("secure_wipe <addr> <count>\r\n"); goto again; }
             usys_secure_wipe((void*)xtoi(a), (unsigned int)xtoi(n));
+            usys_puts("ok\r\n");
+        } else if (streq(cmd, "secure_wipe_heap")) {
+            char *a = next_token(&s); char *n = next_token(&s);
+            if (!a||!n) { usys_puts("secure_wipe_heap <addr> <count>\r\n"); goto again; }
+            usys_secure_wipe_heap((void*)xtoi(a), (unsigned int)xtoi(n));
             usys_puts("ok\r\n");
         } else {
             usys_puts("err: "); usys_puts(cmd); usys_puts("\r\n");

@@ -87,6 +87,65 @@ static int test_secure_wipe(void)
     return buffers_match(buf, BUF_SIZE, 0x00);
 }
 
+static int test_memcpy(void)
+{
+    unsigned char src[BUF_SIZE];
+    unsigned char dst[BUF_SIZE];
+    fill_buffer(src, BUF_SIZE, 0xAB);
+    fill_buffer(dst, BUF_SIZE, 0x00);
+    memcpy(dst, src, 16);
+    return buffers_match(dst, 16, 0xAB) && buffers_match(dst + 16, BUF_SIZE - 16, 0x00);
+}
+
+static int test_memmove_overlap(void)
+{
+    unsigned char buf[BUF_SIZE];
+    fill_buffer(buf, BUF_SIZE, 0x00);
+    memset(buf + 16, 0x42, 8);
+    memmove(buf + 8, buf + 16, 8);
+    return buffers_match(buf + 8, 8, 0x42);
+}
+
+static int test_memcmp(void)
+{
+    unsigned char b1[BUF_SIZE], b2[BUF_SIZE];
+    fill_buffer(b1, BUF_SIZE, 0xAB);
+    fill_buffer(b2, BUF_SIZE, 0xAB);
+    if (memcmp(b1, b2, BUF_SIZE) != 0) return 0;
+    b2[BUF_SIZE - 1] = 0xAC;
+    if (memcmp(b1, b2, BUF_SIZE) == 0) return 0;
+    return 1;
+}
+
+static int test_memchr(void)
+{
+    unsigned char buf[BUF_SIZE];
+    fill_buffer(buf, BUF_SIZE, 0xFF);
+    buf[10] = 0x42;
+    if (memchr(buf, 0x42, BUF_SIZE) != buf + 10) return 0;
+    if (memchr(buf, 0x99, BUF_SIZE) != NULL) return 0;
+    return 1;
+}
+
+static int test_memsetw(void)
+{
+    unsigned char buf[BUF_SIZE];
+    unsigned short *wp = (unsigned short *)buf;
+    memset(buf, 0, BUF_SIZE);
+    memsetw(buf, 0xBEEF, BUF_SIZE / 2);
+    for (size_t i = 0; i < BUF_SIZE / 2; i++)
+        if (wp[i] != 0xBEEF) return 0;
+    return 1;
+}
+
+static int test_secure_wipe_heap(void)
+{
+    unsigned char buf[BUF_SIZE];
+    fill_buffer(buf, BUF_SIZE, 0x88);
+    secure_wipe_heap_rev(buf, BUF_SIZE);
+    return buffers_match(buf, BUF_SIZE, 0x00);
+}
+
 static int test_count_zero(void)
 {
     unsigned char buf[BUF_SIZE];
@@ -191,9 +250,33 @@ int main(void)
         printf("FAIL: NULL dest safety\n");
         failures++;
     }
+    if (!test_memcpy()) {
+        printf("FAIL: memcpy forward copy\n");
+        failures++;
+    }
+    if (!test_memmove_overlap()) {
+        printf("FAIL: memmove overlap\n");
+        failures++;
+    }
+    if (!test_memcmp()) {
+        printf("FAIL: memcmp equality\n");
+        failures++;
+    }
+    if (!test_memchr()) {
+        printf("FAIL: memchr found & not-found\n");
+        failures++;
+    }
+    if (!test_memsetw()) {
+        printf("FAIL: memsetw word fill\n");
+        failures++;
+    }
+    if (!test_secure_wipe_heap()) {
+        printf("FAIL: secure_wipe_heap_rev\n");
+        failures++;
+    }
 
     if (failures == 0) {
-        printf("All 8 tests passed (libmymem.a + libmysecure.a)\n");
+        printf("All 14 tests passed (libmymem.a + libmysecure.a)\n");
         return 0;
     }
 

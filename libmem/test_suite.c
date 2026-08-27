@@ -487,6 +487,186 @@ static int test_memset_rev_partial(void)
     return buffers_match(buf + BUF_SIZE - 8, 8, 0x99);
 }
 
+/* =========================================================================== */
+/*  TEST 11 — memcpy forward copy                                         */
+/* =========================================================================== */
+/*
+ *  Scenario:
+ *      Copy 16 bytes from a source buffer (pre-filled with 0xAB)
+ *      into a destination buffer (pre-filled with 0x00).
+ *      Verify destination has 0xAB and source is unchanged.
+ *
+ *  Why:
+ *      Confirms the new memcpy.asm function (non-overlapping forward copy).
+ *      Source and destination must be intact (no aliasing).
+ */
+static int test_memcpy(void)
+{
+    unsigned char src[BUF_SIZE];
+    unsigned char dst[BUF_SIZE];
+
+    fill_buffer(src, BUF_SIZE, 0xAB);
+    fill_buffer(dst, BUF_SIZE, 0x00);
+
+    memcpy(dst, src, 16);
+
+    if (!buffers_match(dst, 16, 0xAB))
+        return 0;
+    if (!buffers_match(dst + 16, BUF_SIZE - 16, 0x00))
+        return 0;
+    if (!buffers_match(src, BUF_SIZE, 0xAB))
+        return 0;
+
+    return 1;
+}
+
+/* =========================================================================== */
+/*  TEST 12 — memmove overlapping forward                              */
+/* =========================================================================== */
+/*
+ *  Scenario:
+ *      Copy 8 bytes forward by 8 (dst = src - 8) so dest < src with overlap.
+ *      Forward copy reads from higher addresses first, safe.
+ */
+static int test_memmove_overlap_forward(void)
+{
+    unsigned char buf[BUF_SIZE];
+
+    fill_buffer(buf, BUF_SIZE, 0x00);
+    memset(buf + 16, 0x42, 8);   /* bytes [16..23] = 0x42 */
+
+    /* Move [16..23] to [8..15] — dest < src, overlapping */
+    memmove(buf + 8, buf + 16, 8);
+
+    /* dst [8..15] should be 0x42 */
+    return buffers_match(buf + 8, 8, 0x42);
+}
+
+/* =========================================================================== */
+/*  TEST 13 — memmove overlapping backward                             */
+/* =========================================================================== */
+/*
+ *  Scenario:
+ *      Copy 8 bytes backward by 8 (dst = src + 8) so dest > src with overlap.
+ *      memmove must detect dest > src and copy backward to avoid
+ *      corrupting source data.
+ */
+static int test_memmove_overlap_backward(void)
+{
+    unsigned char buf[BUF_SIZE];
+
+    fill_buffer(buf, BUF_SIZE, 0x00);
+    memset(buf, 0x55, 8);         /* bytes [0..7] = 0x55 */
+
+    /* Move [0..7] to [8..15] — dest > src, overlapping */
+    memmove(buf + 8, buf, 8);
+
+    /* dst [8..15] should be 0x55 */
+    return buffers_match(buf + 8, 8, 0x55);
+}
+
+/* =========================================================================== */
+/*  TEST 14 — memcmp equality                                           */
+/* =========================================================================== */
+/*
+ *  Scenario:
+ *      Compare two identical buffers → expect 0.
+ *      Compare two buffers that differ at one byte → expect non-zero.
+ */
+static int test_memcmp(void)
+{
+    unsigned char buf1[BUF_SIZE];
+    unsigned char buf2[BUF_SIZE];
+
+    fill_buffer(buf1, BUF_SIZE, 0xAB);
+    fill_buffer(buf2, BUF_SIZE, 0xAB);
+
+    if (memcmp(buf1, buf2, BUF_SIZE) != 0)
+        return 0;
+
+    buf2[BUF_SIZE - 1] = 0xAC;
+    if (memcmp(buf1, buf2, BUF_SIZE) == 0)
+        return 0;
+
+    return 1;
+}
+
+/* =========================================================================== */
+/*  TEST 15 — memchr found and not found                                  */
+/* =========================================================================== */
+/*
+ *  Scenario:
+ *      Fill buffer with 0xFF, then set one byte to 0x42.
+ *      memchr should find the 0x42 byte.
+ *      memchr for 0x99 should return NULL.
+ */
+static int test_memchr(void)
+{
+    unsigned char buf[BUF_SIZE];
+    unsigned char *result;
+
+    fill_buffer(buf, BUF_SIZE, 0xFF);
+    buf[10] = 0x42;
+
+    result = memchr(buf, 0x42, BUF_SIZE);
+    if (result != buf + 10)
+        return 0;
+
+    result = (unsigned char *)memchr(buf, 0x99, BUF_SIZE);
+    if (result != NULL)
+        return 0;
+
+    return 1;
+}
+
+/* =========================================================================== */
+/*  TEST 16 — memsetw word fill                                        */
+/* =========================================================================== */
+/*
+ *  Scenario:
+ *      Fill a 32-byte buffer with 0xBEEF using memsetw.
+ *      Every 16-bit word should be 0xBEEF.
+ */
+static int test_memsetw(void)
+{
+    unsigned char buf[BUF_SIZE];
+    unsigned short *wp = (unsigned short *)buf;
+
+    memset(buf, 0, BUF_SIZE);
+    memsetw(buf, 0xBEEF, BUF_SIZE / 2);
+
+    for (size_t i = 0; i < BUF_SIZE / 2; i++) {
+        if (wp[i] != 0xBEEF)
+            return 0;
+    }
+
+    return 1;
+}
+
+/* =========================================================================== */
+/*  TEST 17 — secure_wipe_heap_rev                                      */
+/* =========================================================================== */
+/*
+ *  Scenario:
+ *      Pre-fill buffer with 0x88, call secure_wipe_heap_rev.
+ *      Verify all bytes are 0x00.
+ *
+ *  Why:
+ *      Confirms the new secure_wipe_heap_rev.asm function in libmysecure.a
+ *      delegates to memset_rev and zeroes the buffer. Like
+ *      secure_wipe_stack_rev, it is isolated from the compiler via an
+ *      external symbol, preventing DSE on sensitive heap data.
+ */
+static int test_secure_wipe_heap(void)
+{
+    unsigned char buf[BUF_SIZE];
+
+    fill_buffer(buf, BUF_SIZE, 0x88);
+    secure_wipe_heap_rev(buf, BUF_SIZE);
+
+    return buffers_match(buf, BUF_SIZE, 0x00);
+}
+
 /*  -------------------------------------------------------------------------  */
 /*  Section 6 — Test Runner (main)                                            */
 /*  -------------------------------------------------------------------------  */
@@ -580,6 +760,57 @@ int main(void)
         failures++;
     }
 
+    /* --- New function tests (Phase 2 expansion) --- */
+
+    if (test_memcpy())
+        print_result("memcpy forward copy", 1);
+    else {
+        print_result("memcpy forward copy", 0);
+        failures++;
+    }
+
+    if (test_memmove_overlap_forward())
+        print_result("memmove overlap forward", 1);
+    else {
+        print_result("memmove overlap forward", 0);
+        failures++;
+    }
+
+    if (test_memmove_overlap_backward())
+        print_result("memmove overlap backward", 1);
+    else {
+        print_result("memmove overlap backward", 0);
+        failures++;
+    }
+
+    if (test_memcmp())
+        print_result("memcmp equality", 1);
+    else {
+        print_result("memcmp equality", 0);
+        failures++;
+    }
+
+    if (test_memchr())
+        print_result("memchr found & not-found", 1);
+    else {
+        print_result("memchr found & not-found", 0);
+        failures++;
+    }
+
+    if (test_memsetw())
+        print_result("memsetw word fill", 1);
+    else {
+        print_result("memsetw word fill", 0);
+        failures++;
+    }
+
+    if (test_secure_wipe_heap())
+        print_result("secure_wipe_heap_rev", 1);
+    else {
+        print_result("secure_wipe_heap_rev", 0);
+        failures++;
+    }
+
     /*  ------------------------------------------------------- */
     /*  Final summary in green or red                          */
     /*  ------------------------------------------------------- */
@@ -590,7 +821,7 @@ int main(void)
 
     if (failures == 0) {
         printf(COLOR_GREEN COLOR_BOLD
-               "  ALL 10 TESTS PASSED  (libmymem.a + libmysecure.a)\n"
+               "  ALL 17 TESTS PASSED  (libmymem.a + libmysecure.a)\n"
                COLOR_RESET);
         return 0;
     }
