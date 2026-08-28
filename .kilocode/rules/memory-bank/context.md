@@ -16,6 +16,7 @@
 | `build_and_test.sh` | ✅ All checks pass | 6/6 stages pass |
 | `sanity_check.sh` | ✅ All checks pass | |
 | `regression_test.sh` | ✅ 4/4 commits PASS | |
+| `timeline_regression.sh` | ✅ 23/23 commits PASS | Full timeline + coverage evolution |
 
 ## Current Focus
 
@@ -41,7 +42,8 @@ The iron-ram system is complete with:
 ./build_and_test.sh           # full build + test pipeline
 ./build_and_test.sh --qemu    # also launch interactive QEMU
 ./sanity_check.sh             # sanity checks only
-./regression_test.sh          # git history backtest
+./regression_test.sh          # git history backtest (libmem)
+./timeline_regression.sh      # full timeline + all-commit backtest
 ```
 
 ## Session History
@@ -62,4 +64,4 @@ The iron-ram system is complete with:
 | 2026-08-28 | **kmain.c** enumerates all 28 syscalls during boot verification |
 | 2026-08-28 | **shell.c** rewritten with security boundary enforcement + secinfo command |
 | 2026-08-28 | **build_and_test.sh** + **sanity_check.sh** with security verification |
-| 2026-08-28 | Fixed grep pattern bug in security checks (ce98b4b) |
+| 2026-08-28 | **timeline_regression.sh** — comprehensive colour-coded full git history backtest with per-commit build + test for libmem/, os/, boot/; coverage evolution tracking; 23/23 commits PASS |
