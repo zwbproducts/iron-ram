@@ -32,9 +32,12 @@ The iron-ram system is complete with:
 
 - **shell.c** NEVER calls libmem or console_* functions directly
 - **EVERY** kernel service is reached exclusively through `usys_*` wrappers → `int 0x80`
+- **Linker-enforced boundary**: shell.o is verified via `nm -u` to reference ONLY `usys_*` symbols — zero kernel function symbols
+- **Runtime audit logging**: every `int 0x80` syscall is logged with a monotonic audit ID and syscall number
 - **int 0x81** (signals) is kernel-only, used during boot (kmain.c) to verify libmem staging
 - **int 0x0D** (GPF) catches invalid memory accesses and logs them
 - Build scripts verify 0 direct kernel function calls from shell.c
+- Makefile `verify-shell` target uses `nm -u` to prove shell.o only references usys_* symbols
 
 ## Quick Start
 
@@ -68,9 +71,15 @@ The iron-ram system is complete with:
 | 2026-08-28 | **timeline_regression.sh security audit** — added per-commit security invariant verification (A-F checks) across all commits; 26/26 SECURITY PASS |
 | 2026-08-28 | **Fixed**: eliminated grep regex errors (ANSI color codes interpreted as character classes) — switched from `echo|grep` to `printf|grep` for color matching |
 | 2026-08-28 | **Fixed**: false-positive F (bypass) checks — now strips comments and strings before searching shell.c for kernel function references |
+| 2026-08-28 | **Security hardening**: shell.c rewritten as Unix-philosophy shell, runtime syscall audit logging, linker-enforced boundary via `nm -u` verification in Makefile + sanity_check.sh |
 
 ## Recently Completed
 
 - [x] Fixed grep regex errors in timeline_regression.sh security audit (ANSI color codes no longer misinterpreted as regex character classes)
 - [x] Fixed false-positive F-check bypass alerts (now strips block comments and string literals before scanning)
 - [x] All 26 git commits pass security audit with zero false positives and zero errors
+- [x] Rewrote shell.c as Unix-philosophy shell — all 28 commands route through usys_* wrappers only
+- [x] Added runtime syscall audit logging in syscalls.c (monotonic ID + syscall number to serial)
+- [x] Added `nm -u` verification of shell.o (0 non-usys undefined symbols)
+- [x] Makefile `verify-shell` target enforces linker-level boundary at build time
+- [x] sanity_check.sh includes nm-based undefined symbol verification
