@@ -102,7 +102,7 @@ cd "$SCRIPT_DIR"
 # ===========================================================================
 info "4/6  security — shell.c syscall boundary verification"
 
-shell_direct=$(grep -cE '^\s*(memset|memzero|memcpy|memmove|memcmp|memchr|memsetw|memfill|memswap|memreverse|memrotate|memfind|memcount|memchecksum|memeq|secure_wipe|console_)' "$SCRIPT_DIR/os/user/shell.c" 2>/dev/null || echo 0)
+shell_direct=$(grep -cE '^\s*(memset|memzero|memcpy|memmove|memcmp|memchr|memsetw|memfill|memswap|memreverse|memrotate|memfind|memcount|memchecksum|memeq|secure_wipe|console_)' "$SCRIPT_DIR/os/user/shell.c" 2>/dev/null) || shell_direct=0
 if [ "$shell_direct" -eq 0 ]; then
     pass "shell.c: 0 direct kernel calls (all via usys_* wrappers → int 0x80)"
 else

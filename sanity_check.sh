@@ -128,7 +128,7 @@ echo ""
 # ---------------------------------------------------------------------------
 info "Security check: shell.c syscall boundary"
 
-shell_direct_calls=$(grep -E '^\s*(memset|memzero|memcpy|memmove|memcmp|memchr|memsetw|memfill|memswap|memreverse|memrotate_l|memrotate_r|memfind|memcount|memchecksum|memeq|memmove_rev|secure_wipe|console_putc|console_puts|console_puthex|console_gets|console_cls)\s*\(' "$SCRIPT_DIR/os/user/shell.c" 2>/dev/null | wc -l || echo 0)
+shell_direct_calls=$(grep -cE '^\s*(memset|memzero|memcpy|memmove|memcmp|memchr|memsetw|memfill|memswap|memreverse|memrotate_l|memrotate_r|memfind|memcount|memchecksum|memeq|memmove_rev|secure_wipe|console_putc|console_puts|console_puthex|console_gets|console_cls)\s*\(' "$SCRIPT_DIR/os/user/shell.c" 2>/dev/null) || shell_direct_calls=0
 
 if [ "$shell_direct_calls" -eq 0 ]; then
     pass "shell.c: 0 direct kernel function calls (all via usys_* syscall wrappers)"
