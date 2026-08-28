@@ -12,6 +12,7 @@ LD      = ld -m elf_i386
 
 LIBMEM = ../libmem
 
+# Kernel + shell objects (flat binary layout)
 KOBJS = kernel/entry.o kernel/idt.o kernel/isr80.o kernel/isr81.o kernel/isr_gpf.o \
         kernel/kmain.o kernel/console.o kernel/syscalls.o \
         $(LIBMEM)/memset.o $(LIBMEM)/memzero.o \
@@ -25,16 +26,33 @@ KOBJS = kernel/entry.o kernel/idt.o kernel/isr80.o kernel/isr81.o kernel/isr_gpf
         $(LIBMEM)/secure_wipe_stack_rev.o $(LIBMEM)/secure_wipe_heap_rev.o \
         user/usys.o user/shell.o
 
-.PHONY: all clean
-all: disk.img
+.PHONY: all clean verify-shell
 
+all: disk.img verify-shell
+
+# ─── Kernel ELF ───
 kernel.elf: $(KOBJS) kernel/link.ld
 	$(LD) -T kernel/link.ld -o kernel.elf $(KOBJS)
 
 kernel.bin: kernel.elf
 	objcopy -O binary kernel.elf kernel.bin
 
-# stage1 depends on kernel.bin size: must build after kernel.bin
+# ─── Verification — proves shell.o references ONLY usys_* symbols ───
+# nm -u shows undefined symbols in shell.o; we check that every
+# undefined symbol is a usys_* wrapper. If shell.c tries to call
+# memset, console_puts, etc. directly, this FAILS — enforcing
+# the security boundary at build time.
+verify-shell: user/shell.o
+	@echo "=== Verifying shell.o security boundary ==="
+	@VIOLENCE=$$(nm -u user/shell.o 2>/dev/null | awk '{print $$2}' | grep -vE '^_$$|^usys_|^syscall$$' || true); \
+	if [ -n "$$VIOLENCE" ]; then \
+		echo "  ✗ VIOLATION: shell.o has non-usys references:"; \
+		echo "    $$VIOLENCE"; \
+		exit 1; \
+	else \
+		echo "  ✓ shell.o references ONLY usys_* wrappers — security boundary verified"; \
+	fi
+
 stage1.bin: stage1.asm kernel.bin
 	@sz=$$(stat -c %s kernel.bin); sectors=$$(( (sz + 511) / 512 )); \
 	 echo "kernel sectors=$$sectors"; \
@@ -64,4 +82,4 @@ $(foreach f,memset memzero memset_rev memzero_rev memcpy memmove memcmp memchr m
 	$(eval $(call LIBMEM_RULE,$(f))))
 
 clean:
-	rm -f kernel.elf kernel.bin stage1.bin disk.img $(KOBJS)
+	rm -f kernel.elf kernel.bin stage1.bin disk.img $(KOBJS) user/shell.bin

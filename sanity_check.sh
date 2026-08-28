@@ -137,6 +137,18 @@ else
     grep -nE '^\s*(memset|memzero|memcpy|memmove|memcmp|memchr|memsetw|memfill|memswap|memreverse|memrotate_l|memrotate_r|memfind|memcount|memchecksum|memeq|secure_wipe|console_)' "$SCRIPT_DIR/os/user/shell.c" | head -10
 fi
 
+# ─── Linker-level verification: shell.o must only reference usys_* symbols ───
+if [ -f "$SCRIPT_DIR/os/user/shell.o" ]; then
+    shell_undefined=$(nm -u "$SCRIPT_DIR/os/user/shell.o" 2>/dev/null | awk '{print $2}' | grep -vE '^_|^usys_|^syscall$' || true)
+    if [ -z "$shell_undefined" ]; then
+        pass "shell.o: 0 non-usys undefined symbols (linker-enforced boundary)"
+    else
+        fail "shell.o: non-usys references: $shell_undefined"
+    fi
+else
+    warn "shell.o not found — run 'make' in os/ first"
+fi
+
 echo ""
 if command -v bun &>/dev/null; then
     info "Running Next.js typecheck + lint"

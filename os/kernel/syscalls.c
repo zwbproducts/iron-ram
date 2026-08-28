@@ -15,6 +15,10 @@
 #include "syscall.h"
 #include "console.h"
 
+/* Syscall audit counter — incremented on EVERY int 0x80
+ * Logged to serial port for forensic traceability. */
+static unsigned long syscall_audit_counter = 0;
+
 /* libmem routines (32-bit asm) — kernel-owned, exported via syscall table */
 extern void *memset(void *dest, int c, unsigned long count);
 extern void *memzero(void *dest, unsigned long count);
@@ -38,10 +42,28 @@ extern void *memmove_rev(void *dest, const void *src, unsigned long count);
 extern void *secure_wipe_stack_rev(void *stack_dest, unsigned long wipe_count);
 extern void *secure_wipe_heap_rev(void *heap_dest, unsigned long wipe_count);
 
-/* dispatch: eax=num, ebx=a0, ecx=a1, edx=a2 -> eax=result */
+/* Audit log — writes to COM1 serial port for forensic traceability.
+ * Called before every syscall_dispatch to log: audit_id, syscall_number.
+ */
+static void audit_log(unsigned long id, unsigned long num) {
+    console_puts("AUDIT ");
+    console_puthex(id);
+    console_puts(" syscall=");
+    console_puthex(num);
+    console_puts("\r\n");
+}
+
+/* dispatch: eax=num, ebx=a0, ecx=a1, edx=a2 -> eax=result
+ *
+ * The ONLY sanctioned path from userland to kernel services.
+ * Every syscall is audited with a monotonically increasing ID.
+ */
 unsigned long syscall_dispatch(unsigned long num, unsigned long a0,
                                unsigned long a1, unsigned long a2)
 {
+    syscall_audit_counter++;
+    audit_log(syscall_audit_counter, num);
+
     switch (num) {
     /* --- original 12 syscalls --- */
     case SYS_memset:        return (unsigned long)memset((void*)a0, (int)a1, a2);
@@ -97,6 +119,10 @@ unsigned long syscall_dispatch(unsigned long num, unsigned long a0,
     case SYS_memmove_rev:   return (unsigned long)memmove_rev((void*)a0, (const void*)a1, a2);
 
     default:
+        audit_log(syscall_audit_counter, num);
+        console_puts("SECURITY: invalid syscall=");
+        console_puthex(num);
+        console_puts(" from userland\r\n");
         return 0;
     }
 }
