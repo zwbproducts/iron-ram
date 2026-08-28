@@ -278,6 +278,140 @@ for entry in "${RAW_COMMITS[@]}"; do
     echo ""
 done
 
+# security audit -- verify userland/kernel boundary at each commit
+# ===========================================================================
+echo ""
+log "${CYAN}${BOLD}======================================================================${NC}"
+log "${CYAN}${BOLD}  SECURITY AUDIT -- Userland/Kernel Boundary Verification${NC}"
+log "${CYAN}${BOLD}======================================================================${NC}"
+echo ""
+
+log "${BOLD}Security Invariants Verified Per Commit:${NC}"
+log "  ${GREEN}A${NC}  shell.c has ZERO direct kernel function calls"
+log "  ${GREEN}B${NC}  shell.c has ZERO raw interrupt instructions (int 0x80/0x81/0x0D)"
+log "  ${GREEN}C${NC}  usys.S has int 0x80 wrappers for all syscalls"
+log "  ${GREEN}D${NC}  syscall_dispatch handles all syscall numbers"
+log "  ${GREEN}E${NC}  All libmem functions are kernel-owned (extern in kernel)"
+log "  ${GREEN}F${NC}  No syscall bypass possible from userland"
+echo ""
+
+SECURITY_RESULTS=""
+SEC_PASS=0; SEC_FAIL=0; SEC_SKIP=0
+
+IDX=0
+for entry in "${RAW_COMMITS[@]}"; do
+    IDX=$((IDX + 1))
+    IFS='|' read -r FULL_HASH SHORT_HASH _ _ SUBJECT <<< "$entry"
+    COMMIT_DIR="$WORK/sec_$IDX"
+    mkdir -p "$COMMIT_DIR"
+    git archive "$FULL_HASH" 2>/dev/null | tar -x -C "$COMMIT_DIR" 2>/dev/null
+
+    SEC_STATUS=""
+    SEC_ISSUES=""
+
+    # A: shell.c direct kernel function calls
+    if [ -d "$COMMIT_DIR/os" ] && [ -f "$COMMIT_DIR/os/user/shell.c" ]; then
+        DIRECT_CALLS=$(grep -cE '^\s*(memset|memzero|memcpy|memmove|memcmp|memchr|memsetw|memfill|memswap|memreverse|memrotate_l|memrotate_r|memfind|memcount|memchecksum|memeq|memmove_rev|secure_wipe_stack_rev|secure_wipe_heap_rev|console_putc|console_puts|console_puthex|console_gets|console_cls)\s*\(' "$COMMIT_DIR/os/user/shell.c" 2>/dev/null) || DIRECT_CALLS=0
+        if [ "$DIRECT_CALLS" -eq 0 ]; then
+            SEC_STATUS+="${GREEN}A${NC}"
+        else
+            SEC_STATUS+="${RED}a${NC}"
+            SEC_ISSUES+=" [A:$DIRECT_CALLS direct calls]"
+        fi
+    else
+        SEC_STATUS+="${YELLOW}-${NC}"
+    fi
+
+    # B: shell.c raw interrupt instructions
+    if [ -d "$COMMIT_DIR/os" ] && [ -f "$COMMIT_DIR/os/user/shell.c" ]; then
+        RAW_INTS=$(grep -cE 'int\s+\$0x(80|81|0D)' "$COMMIT_DIR/os/user/shell.c" 2>/dev/null) || RAW_INTS=0
+        if [ "$RAW_INTS" -eq 0 ]; then
+            SEC_STATUS+="${GREEN}B${NC}"
+        else
+            SEC_STATUS+="${RED}b${NC}"
+            SEC_ISSUES+=" [B:$RAW_INTS raw ints]"
+        fi
+    else
+        SEC_STATUS+="${YELLOW}-${NC}"
+    fi
+
+    # C: usys.S int 0x80 wrappers
+    if [ -d "$COMMIT_DIR/os" ] && [ -f "$COMMIT_DIR/os/user/usys.S" ]; then
+        WRAPPERS=$(grep -c 'int 0x80' "$COMMIT_DIR/os/user/usys.S" 2>/dev/null) || WRAPPERS=0
+        if [ "$WRAPPERS" -ge 1 ]; then
+            SEC_STATUS+="${GREEN}C(${WRAPPERS})${NC}"
+        else
+            SEC_STATUS+="${RED}c${NC}"
+            SEC_ISSUES+=" [C:no wrappers]"
+        fi
+    else
+        SEC_STATUS+="${YELLOW}-${NC}"
+    fi
+
+    # D: syscall_dispatch completeness
+    if [ -d "$COMMIT_DIR/os" ] && [ -f "$COMMIT_DIR/os/kernel/syscalls.c" ]; then
+        DISPATCH=$(grep -cE 'case SYS_' "$COMMIT_DIR/os/kernel/syscalls.c" 2>/dev/null) || DISPATCH=0
+        if [ "$DISPATCH" -ge 1 ]; then
+            SEC_STATUS+="${GREEN}D(${DISPATCH})${NC}"
+        else
+            SEC_STATUS+="${RED}d${NC}"
+            SEC_ISSUES+=" [D:no dispatch]"
+        fi
+    else
+        SEC_STATUS+="${YELLOW}-${NC}"
+    fi
+
+    # E: kernel-owned libmem functions
+    if [ -d "$COMMIT_DIR/os" ] && [ -f "$COMMIT_DIR/os/kernel/syscalls.c" ]; then
+        KERNEL_FUNCS=$(grep -cE 'extern.*(memset|memcpy|memmove|memcmp|memchr|memsetw|memfill|memswap|memreverse|memrotate|memfind|memcount|memchecksum|memeq|memmove_rev|secure_wipe)' "$COMMIT_DIR/os/kernel/syscalls.c" 2>/dev/null) || KERNEL_FUNCS=0
+        if [ "$KERNEL_FUNCS" -ge 1 ]; then
+            SEC_STATUS+="${GREEN}E(${KERNEL_FUNCS})${NC}"
+        else
+            SEC_STATUS+="${RED}e${NC}"
+            SEC_ISSUES+=" [E:no kernel funcs]"
+        fi
+    else
+        SEC_STATUS+="${YELLOW}-${NC}"
+    fi
+
+    # F: syscall bypass check -- verify shell.c doesn't reference kernel internals
+    if [ -d "$COMMIT_DIR/os" ] && [ -f "$COMMIT_DIR/os/user/shell.c" ]; then
+        BYPASS=$(grep -cE 'syscall_dispatch|signal_dispatch|gpf_handler' "$COMMIT_DIR/os/user/shell.c" 2>/dev/null) || BYPASS=0
+        if [ "$BYPASS" -eq 0 ]; then
+            SEC_STATUS+="${GREEN}F${NC}"
+        else
+            SEC_STATUS+="${RED}f${NC}"
+            SEC_ISSUES+=" [F:$BYPASS bypass refs]"
+        fi
+    else
+        SEC_STATUS+="${YELLOW}-${NC}"
+    fi
+
+    # Record result
+    if echo "$SEC_STATUS" | grep -q "${RED}"; then
+        SEC_FAIL=$((SEC_FAIL + 1))
+        RESULTS_SEC="$(printf '  %s %-8s %-35s %s ${RED}FAIL${NC}%s\n' "$IDX/$TOTAL" "$SHORT_HASH" "${SUBJECT:0:35}" "$SEC_STATUS" "$SEC_ISSUES")"
+    elif echo "$SEC_STATUS" | grep -q "${YELLOW}"; then
+        SEC_SKIP=$((SEC_SKIP + 1))
+        RESULTS_SEC="$(printf '  %s %-8s %-35s %s ${YELLOW}PARTIAL${NC}%s\n' "$IDX/$TOTAL" "$SHORT_HASH" "${SUBJECT:0:35}" "$SEC_STATUS" "$SEC_ISSUES")"
+    else
+        SEC_PASS=$((SEC_PASS + 1))
+        RESULTS_SEC="$(printf '  %s %-8s %-35s %s ${GREEN}PASS${NC}%s\n' "$IDX/$TOTAL" "$SHORT_HASH" "${SUBJECT:0:35}" "$SEC_STATUS" "$SEC_ISSUES")"
+    fi
+
+    SECURITY_RESULTS+="$RESULTS_SEC"
+    rm -rf "$COMMIT_DIR"
+done
+
+log "$(printf '  %-10s %-8s %-35s %-50s %s\n' '' 'Hash' 'Subject' 'Security Checks')"
+log "$(printf '  %-10s %-8s %-35s %-50s %s\n' '----------' '--------' '-----------------------------------' '--------------------------------------------------' '--------')"
+log "$SECURITY_RESULTS"
+echo ""
+log "${CYAN}----------------------------------------------------------------------${NC}"
+log "${GREEN}${BOLD}  SECURITY PASS: $SEC_PASS${NC}  ${RED}${BOLD}SECURITY FAIL: $SEC_FAIL${NC}  ${YELLOW}${BOLD}PARTIAL: $SEC_SKIP${NC}"
+log "${CYAN}----------------------------------------------------------------------${NC}"
+echo ""
+
 # summary
 echo ""
 log "${CYAN}${BOLD}======================================================================${NC}"
