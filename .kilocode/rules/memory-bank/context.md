@@ -65,3 +65,12 @@ The iron-ram system is complete with:
 | 2026-08-28 | **shell.c** rewritten with security boundary enforcement + secinfo command |
 | 2026-08-28 | **build_and_test.sh** + **sanity_check.sh** with security verification |
 | 2026-08-28 | **timeline_regression.sh** — comprehensive colour-coded full git history backtest with per-commit build + test for libmem/, os/, boot/; coverage evolution tracking; 23/23 commits PASS |
+| 2026-08-28 | **timeline_regression.sh security audit** — added per-commit security invariant verification (A-F checks) across all commits; 26/26 SECURITY PASS |
+| 2026-08-28 | **Fixed**: eliminated grep regex errors (ANSI color codes interpreted as character classes) — switched from `echo|grep` to `printf|grep` for color matching |
+| 2026-08-28 | **Fixed**: false-positive F (bypass) checks — now strips comments and strings before searching shell.c for kernel function references |
+
+## Recently Completed
+
+- [x] Fixed grep regex errors in timeline_regression.sh security audit (ANSI color codes no longer misinterpreted as regex character classes)
+- [x] Fixed false-positive F-check bypass alerts (now strips block comments and string literals before scanning)
+- [x] All 26 git commits pass security audit with zero false positives and zero errors
