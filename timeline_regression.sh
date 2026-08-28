@@ -374,9 +374,18 @@ for entry in "${RAW_COMMITS[@]}"; do
         SEC_STATUS+="${YELLOW}-${NC}"
     fi
 
-    # F: syscall bypass check -- verify shell.c doesn't reference kernel internals
+    # F: syscall bypass check -- verify shell.c doesn't CALL kernel internals
+    # (allow references in comments/strings, but not actual function calls)
     if [ -d "$COMMIT_DIR/os" ] && [ -f "$COMMIT_DIR/os/user/shell.c" ]; then
-        BYPASS=$(grep -cE 'syscall_dispatch|signal_dispatch|gpf_handler' "$COMMIT_DIR/os/user/shell.c" 2>/dev/null) || BYPASS=0
+        # remove block comments (multi-line /* ... */) and line comments (//)
+        # then strip string literals to find actual code references
+        SHELL_TMP=$(mktemp)
+        sed -e ':a' -e 'N' -e '$!ba' -e 's|/\*.*?\*/||g' \
+            "$COMMIT_DIR/os/user/shell.c" | \
+            sed -e 's|//.*||g' -e 's|^.*\* .*||g' | \
+            sed 's/"[^"]*"/" "/g' > "$SHELL_TMP"
+        BYPASS=$(grep -cE 'syscall_dispatch|signal_dispatch|gpf_handler' "$SHELL_TMP" 2>/dev/null) || BYPASS=0
+        rm -f "$SHELL_TMP"
         if [ "$BYPASS" -eq 0 ]; then
             SEC_STATUS+="${GREEN}F${NC}"
         else
@@ -387,16 +396,16 @@ for entry in "${RAW_COMMITS[@]}"; do
         SEC_STATUS+="${YELLOW}-${NC}"
     fi
 
-    # Record result
-    if echo "$SEC_STATUS" | grep -q "${RED}"; then
+    # Record result -- use printf %s to avoid grep interpreting ANSI codes
+    if printf '%s' "$SEC_STATUS" | grep -qF "$(printf '\033[0;31m')"; then
         SEC_FAIL=$((SEC_FAIL + 1))
-        RESULTS_SEC="$(printf '  %s %-8s %-35s %s ${RED}FAIL${NC}%s\n' "$IDX/$TOTAL" "$SHORT_HASH" "${SUBJECT:0:35}" "$SEC_STATUS" "$SEC_ISSUES")"
-    elif echo "$SEC_STATUS" | grep -q "${YELLOW}"; then
+        RESULTS_SEC="$(printf '  %s %-8s %-35s %s %s %s\n' "$IDX/$TOTAL" "$SHORT_HASH" "${SUBJECT:0:35}" "$SEC_STATUS" "${RED}FAIL${NC}" "$SEC_ISSUES")"
+    elif printf '%s' "$SEC_STATUS" | grep -qF "$(printf '\033[1;33m')"; then
         SEC_SKIP=$((SEC_SKIP + 1))
-        RESULTS_SEC="$(printf '  %s %-8s %-35s %s ${YELLOW}PARTIAL${NC}%s\n' "$IDX/$TOTAL" "$SHORT_HASH" "${SUBJECT:0:35}" "$SEC_STATUS" "$SEC_ISSUES")"
+        RESULTS_SEC="$(printf '  %s %-8s %-35s %s %s %s\n' "$IDX/$TOTAL" "$SHORT_HASH" "${SUBJECT:0:35}" "$SEC_STATUS" "${YELLOW}PARTIAL${NC}" "$SEC_ISSUES")"
     else
         SEC_PASS=$((SEC_PASS + 1))
-        RESULTS_SEC="$(printf '  %s %-8s %-35s %s ${GREEN}PASS${NC}%s\n' "$IDX/$TOTAL" "$SHORT_HASH" "${SUBJECT:0:35}" "$SEC_STATUS" "$SEC_ISSUES")"
+        RESULTS_SEC="$(printf '  %s %-8s %-35s %s %s %s\n' "$IDX/$TOTAL" "$SHORT_HASH" "${SUBJECT:0:35}" "$SEC_STATUS" "${GREEN}PASS${NC}" "$SEC_ISSUES")"
     fi
 
     SECURITY_RESULTS+="$RESULTS_SEC"
