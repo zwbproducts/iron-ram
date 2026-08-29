@@ -1,9 +1,4 @@
-# os/Makefile — build the 32-bit kernel + C shell and disk image
-# Run from this directory:  make -C os
-#
-# Tool: bun workspace uses gcc-multilib; here we use plain gcc -m32 + nasm.
-# Order: build kernel.elf -> kernel.bin first, then compute sector count,
-#        then assemble stage1.asm (16-bit) with the real KERNEL_SECTORS.
+# os/Makefile — build the 32-bit kernel + userland and disk image
 
 CC      = gcc -m32 -ffreestanding -nostdlib -fno-pie -fno-stack-protector
 NASMF16 = nasm -f bin
@@ -12,8 +7,8 @@ LD      = ld -m elf_i386
 
 LIBMEM = ../libmem
 
-# Kernel + shell objects (flat binary layout)
-KOBJS = kernel/entry.o kernel/idt.o kernel/isr80.o kernel/isr81.o kernel/isr_gpf.o \
+# Kernel objects
+KOBJS = kernel/entry.o kernel/idt.o kernel/isr80.o kernel/isr81.o \
         kernel/kmain.o kernel/console.o kernel/syscalls.o \
         $(LIBMEM)/memset.o $(LIBMEM)/memzero.o \
         $(LIBMEM)/memset_rev.o $(LIBMEM)/memzero_rev.o \
@@ -23,10 +18,12 @@ KOBJS = kernel/entry.o kernel/idt.o kernel/isr80.o kernel/isr81.o kernel/isr_gpf
         $(LIBMEM)/memrotate_l.o $(LIBMEM)/memrotate_r.o \
         $(LIBMEM)/memfind.o $(LIBMEM)/memcount.o \
         $(LIBMEM)/memchecksum.o $(LIBMEM)/memeq.o $(LIBMEM)/memmove_rev.o \
-        $(LIBMEM)/secure_wipe_stack_rev.o $(LIBMEM)/secure_wipe_heap_rev.o \
-        user/usys.o user/shell.o
+        $(LIBMEM)/secure_wipe_stack_rev.o $(LIBMEM)/secure_wipe_heap_rev.o
 
-.PHONY: all clean verify-shell
+# Userland objects
+UOBJS = user/usys.o user/shell.o
+
+.PHONY: all clean verify-shell disk.img
 
 all: disk.img verify-shell
 
@@ -37,32 +34,41 @@ kernel.elf: $(KOBJS) kernel/link.ld
 kernel.bin: kernel.elf
 	objcopy -O binary kernel.elf kernel.bin
 
-# ─── Verification — proves shell.o references ONLY usys_* symbols ───
-# nm -u shows undefined symbols in shell.o; we check that every
-# undefined symbol is a usys_* wrapper. If shell.c tries to call
-# memset, console_puts, etc. directly, this FAILS — enforcing
-# the security boundary at build time.
+# ─── Userland ELF ───
+userland.elf: $(UOBJS) user/userland.ld
+	$(LD) -T user/userland.ld -o userland.elf $(UOBJS)
+
+userland.bin: userland.elf
+	objcopy -O binary userland.elf userland.bin
+
+# ─── Boot sector ───
+stage1.bin: stage1.asm kernel.bin userland.bin
+	@ksz=$$(stat -c %s kernel.bin); ksect=$$(( (ksz + 511) / 512 )); \
+	 usz=$$(stat -c %s userland.bin); usect=$$(( (usz + 511) / 512 )); \
+	 echo "kernel sectors=$$ksect, userland sectors=$$usect"; \
+	 $(NASMF16) -DKERNEL_SECTORS=$$ksect -DUSER_SECTORS=$$usect -o stage1.bin stage1.asm
+
+# ─── Disk image ───
+disk.img: stage1.bin kernel.bin userland.bin
+	dd if=/dev/zero of=disk.img bs=1024 count=1440 2>/dev/null
+	dd if=stage1.bin of=disk.img conv=notrunc bs=512 2>/dev/null
+	dd if=kernel.bin of=disk.img conv=notrunc bs=512 seek=1 2>/dev/null
+	@ksz=$$(stat -c %s kernel.bin); ksect=$$(( (ksz + 511) / 512 )); \
+	 dd if=userland.bin of=disk.img conv=notrunc bs=512 seek=$$((1 + ksect)) 2>/dev/null
+
+# ─── Verification ───
 verify-shell: user/shell.o
 	@echo "=== Verifying shell.o security boundary ==="
-	@VIOLENCE=$$(nm -u user/shell.o 2>/dev/null | awk '{print $$2}' | grep -vE '^_$$|^usys_|^syscall$$' || true); \
-	if [ -n "$$VIOLENCE" ]; then \
-		echo "  ✗ VIOLATION: shell.o has non-usys references:"; \
-		echo "    $$VIOLENCE"; \
-		exit 1; \
-	else \
-		echo "  ✓ shell.o references ONLY usys_* wrappers — security boundary verified"; \
-	fi
+	@VIOLATIONS=$$(nm -u user/shell.o 2>/dev/null | awk '{print $$2}' | grep -vE '^_$$|^usys_|^syscall$$' || true); \
+	 if [ -n "$$VIOLATIONS" ]; then \
+	     echo "  VIOLATION: shell.o has non-usys references:"; \
+	     echo "    $$VIOLATIONS"; \
+	     exit 1; \
+	 else \
+	     echo "  shell.o references ONLY usys_* wrappers — security boundary verified"; \
+	 fi
 
-stage1.bin: stage1.asm kernel.bin
-	@sz=$$(stat -c %s kernel.bin); sectors=$$(( (sz + 511) / 512 )); \
-	 echo "kernel sectors=$$sectors"; \
-	 $(NASMF16) -DLOAD_KERNEL_SECTORS=$$sectors -o stage1.bin stage1.asm
-
-disk.img: stage1.bin kernel.bin
-	dd if=/dev/zero of=disk.img bs=1024 count=1440
-	dd if=stage1.bin of=disk.img conv=notrunc bs=512
-	dd if=kernel.bin  of=disk.img conv=notrunc bs=512 seek=1
-
+# ─── Build rules ───
 kernel/%.o: kernel/%.c
 	$(CC) -Ikernel -c $< -o $@
 kernel/%.o: kernel/%.asm
@@ -72,8 +78,7 @@ user/%.o: user/%.c
 user/%.o: user/%.S
 	$(NASMF32) $< -o $@
 
-# Pattern rules with '..' directory components don't match in GNU make, so
-# generate explicit rules for each libmem .o.
+# libmem objects
 define LIBMEM_RULE
 $(LIBMEM)/$(1).o: $(LIBMEM)/$(1).asm
 	$$(NASMF32) $$< -o $$@
@@ -82,4 +87,6 @@ $(foreach f,memset memzero memset_rev memzero_rev memcpy memmove memcmp memchr m
 	$(eval $(call LIBMEM_RULE,$(f))))
 
 clean:
-	rm -f kernel.elf kernel.bin stage1.bin disk.img $(KOBJS) user/shell.bin
+	rm -f kernel.elf kernel.bin stage1.bin userland.elf userland.bin disk.img
+	rm -f kernel/*.o user/*.o
+	rm -f $(LIBMEM)/*.o

@@ -1,14 +1,13 @@
-/* link.ld — kernel linker script */
-/* Kernel loaded at 0x100000 (1 MB) */
+/* userland.ld — userland linker script */
+/* Userland loaded at 0x200000 (2 MB) */
 
 ENTRY(_start)
 
 SECTIONS
 {
-    . = 0x100000;
+    . = 0x200000;
 
     .text : {
-        *(.text._start)
         *(.text .text.*)
     }
 
@@ -21,10 +20,8 @@ SECTIONS
     }
 
     .bss : {
-        __bss_start = .;
         *(.bss .bss.*)
         *(COMMON)
-        __bss_end = .;
     }
 
     /DISCARD/ : {

@@ -1,34 +1,61 @@
-; isr80.asm — handler for `int 0x80` syscalls
+; isr80.asm — Syscall handler (int 0x80)
+; This is the ONLY entry point from userland to kernel.
 ;
 ; ABI:
-;   eax = syscall number, ebx = arg0, ecx = arg1, edx = arg2
-;   result returned in eax.
+;   EAX = syscall number
+;   EBX = arg0
+;   ECX = arg1
+;   EDX = arg2
+;   Returns: EAX = result
 ;
-; pusha layout (after pusha, esp points here):
-;   [esp+0]  = EAX (saved)  -> this is where we write the result
-;   [esp+4]  = ECX
-;   [esp+8]  = EDX
-;   [esp+12] = EBX
-;   [esp+16] = ESP (original, ignored)
-;   [esp+20] = EBP
-;   [esp+24] = ESI
-;   [esp+28] = EDI
-; No error code is pushed for vector 0x80, so the stack is exactly the
-; pusha block. We call syscall_dispatch(num,a0,a1,a2) -> result in eax,
-; then store eax into the saved-EAX slot so popa restores it.
+; The handler validates the syscall number, dispatches to the kernel
+; implementation, and returns a controlled result.
 
-[bits 32]
-global isr80_handler
-extern syscall_dispatch
+[BITS 32]
+GLOBAL isr80_handler
+EXTERN syscall_dispatch
 
+section .text
 isr80_handler:
-    pusha
-    push edx
-    push ecx
+    ; Save all registers (syscall args + scratch)
     push ebx
-    push eax
+    push ecx
+    push edx
+    push esi
+    push edi
+    push ebp
+
+    ; Validate syscall number
+    cmp  eax, 12              ; MAX_SYSCALLS
+    jae  .invalid
+
+    ; Save syscall number and args on stack for C dispatcher
+    push edx                  ; arg2
+    push ecx                  ; arg1
+    push ebx                  ; arg0
+    push eax                  ; syscall number
+
+    ; Call C dispatcher
     call syscall_dispatch
-    add  esp, 16                  ; pop the four arg pushes
-    mov  [esp + 0], eax           ; write result into saved EAX slot
-    popa
+
+    ; Clean up args (cdecl: caller cleanup, but we pushed them)
+    add  esp, 16
+
+    ; Restore registers (except EAX which holds return value)
+    pop  ebp
+    pop  edi
+    pop  esi
+    pop  edx
+    pop  ecx
+    pop  ebx
+    iret
+
+.invalid:
+    mov  eax, -1              ; Return error for invalid syscall
+    pop  ebp
+    pop  edi
+    pop  esi
+    pop  edx
+    pop  ecx
+    pop  ebx
     iret
