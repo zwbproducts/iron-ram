@@ -87,3 +87,8 @@ The iron-ram system is complete with:
 - [x] **32-bit protected-mode bootloader operational** — serial output now shows `SL...KCPQSK 32-bit kernel booted.` confirming: boot sector loads, kernel disk reads, kernel copy to 0x100000, A20 enable, GDT load, PM switch, far jump to pm_entry (Q), kernel _start (S), kernel init (K), kernel booted message.
 - [x] **Root cause**: After kernel copy from 0x8000→0x100000, ES was 0xFFFF (set by `mov ax,0xFFFF; mov es,ax`). GDT copy used `mov word [es:di],0` with ES=0xFFFF, writing to 0xFFFF:0x900 = physical 0x108F00. LGDT loaded wrong GDT base. Fix: reset ES=0 before GDT setup.
 - [x] **GDT byte-order fix**: Used byte-by-byte stores for GDT entries to avoid 16-bit word-endianness issues with `0xCF00` and `0x9A00` values.
+- [x] **Kernel copy loop fix**: Changed `shl cx, 7` to `shl cx, 8` in stage1.asm to copy the full kernel (sectors × 256 words/sector, not × 128).
+- [x] **Known issue**: Kernel boots to entry.asm (serial: `SLKCPQSIKB`) but hangs at `call kmain`. C function calls from kmain don't execute. Inline assembly in kmain works. Root cause not yet identified - possibly stack or calling convention issue.
+- [x] All 31 git commits pass timeline regression (security audit A-F invariants)
+- [x] All 6/6 build_and_test.sh stages pass
+- [x] sanity_check.sh passes (security boundary + nm verification)

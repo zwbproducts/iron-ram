@@ -85,10 +85,11 @@ static void libmem_signals(void) {
 
 void kmain(void) {
     console_init();
-    __asm__ volatile ("movb $'1', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     console_cls();
-    __asm__ volatile ("movb $'2', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     console_puts("K 32-bit kernel booted\r\n");
+
+    /* 1. Verify libmem subsystem is staged and ready (signal path) */
+    libmem_signals();
 
     /* 2. Enumerate all 28 syscall entry points (staged in kernel binary) */
     verify_syscalls();

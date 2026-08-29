@@ -35,12 +35,6 @@ static void scroll_if_needed(void) {
 
 void console_init(void) {
     /* nothing; COM1 is served by QEMU -serial */
-    /* force a known-good serial write */
-    {
-        unsigned short port = 0x3F8;
-        unsigned char val = 'Z';
-        __asm__ volatile ("outb %0, %1" :: "a"(val), "Nd"(port));
-    }
 }
 
 void console_cls(void) {

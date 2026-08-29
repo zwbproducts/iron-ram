@@ -41,7 +41,6 @@ _start:
 
     ; --- hand off to C ---
     call kmain
-
 .halt:
     cli
     hlt

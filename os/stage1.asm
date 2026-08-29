@@ -78,7 +78,7 @@ no_wrap:
     mov  es, ax
     mov  di, 0x0010
     mov  cx, KERNEL_SECTORS
-    shl  cx, 7
+    shl  cx, 8                    ; sectors * 256 words/sector = total words
     cld
     rep  movsw
 
