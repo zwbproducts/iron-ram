@@ -27,9 +27,16 @@ _start:
     ; --- install IDT (vector 0x80) ---
     call idt_init
 
+    mov  al, 'I'
+    mov  dx, 0x3F8
+    out  dx, al
+
     ; --- debug: serial 'K' ---
     mov  al, 'K'
     mov  dx, 0x3F8
+    out  dx, al
+
+    mov  al, 'B'
     out  dx, al
 
     ; --- hand off to C ---

@@ -83,3 +83,7 @@ The iron-ram system is complete with:
 - [x] Added `nm -u` verification of shell.o (0 non-usys undefined symbols)
 - [x] Makefile `verify-shell` target enforces linker-level boundary at build time
 - [x] sanity_check.sh includes nm-based undefined symbol verification
+- [x] **Fixed 32-bit bootloader (os/stage1.asm)** — ES register was 0xFFFF after kernel copy, causing GDT to be written to physical address 0x108F00 instead of 0x900. Fixed by resetting both DS and ES to 0 before GDT setup.
+- [x] **32-bit protected-mode bootloader operational** — serial output now shows `SL...KCPQSK 32-bit kernel booted.` confirming: boot sector loads, kernel disk reads, kernel copy to 0x100000, A20 enable, GDT load, PM switch, far jump to pm_entry (Q), kernel _start (S), kernel init (K), kernel booted message.
+- [x] **Root cause**: After kernel copy from 0x8000→0x100000, ES was 0xFFFF (set by `mov ax,0xFFFF; mov es,ax`). GDT copy used `mov word [es:di],0` with ES=0xFFFF, writing to 0xFFFF:0x900 = physical 0x108F00. LGDT loaded wrong GDT base. Fix: reset ES=0 before GDT setup.
+- [x] **GDT byte-order fix**: Used byte-by-byte stores for GDT entries to avoid 16-bit word-endianness issues with `0xCF00` and `0x9A00` values.
