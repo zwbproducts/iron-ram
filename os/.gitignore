@@ -9,3 +9,5 @@
 /*.o
 /kernel/*.o
 /user/*.o
+/userland.bin
+/userland.elf

@@ -16,10 +16,10 @@
 GLOBAL userland_start
 GLOBAL _start
 
-section .text
+section .text._start
 _start:
 userland_start:
-    ; Heartbeat: U = userland entered
+    ; Heartbeat: U = userland entered (via syscall, not direct I/O)
     mov  al, 'U'
     call do_putc
 

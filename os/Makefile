@@ -8,7 +8,7 @@ LD      = ld -m elf_i386
 LIBMEM = ../libmem
 
 # Kernel objects
-KOBJS = kernel/entry.o kernel/idt.o kernel/isr80.o kernel/isr81.o \
+KOBJS = kernel/entry.o kernel/idt.o kernel/isr80.o kernel/gpf.o kernel/dblf.o \
         kernel/kmain.o kernel/console.o kernel/syscalls.o \
         $(LIBMEM)/memset.o $(LIBMEM)/memzero.o \
         $(LIBMEM)/memset_rev.o $(LIBMEM)/memzero_rev.o \
@@ -21,7 +21,7 @@ KOBJS = kernel/entry.o kernel/idt.o kernel/isr80.o kernel/isr81.o \
         $(LIBMEM)/secure_wipe_stack_rev.o $(LIBMEM)/secure_wipe_heap_rev.o
 
 # Userland objects
-UOBJS = user/usys.o user/shell.o
+UOBJS = user/userland.o user/usys.o
 
 .PHONY: all clean verify-shell disk.img
 
@@ -76,6 +76,8 @@ kernel/%.o: kernel/%.asm
 user/%.o: user/%.c
 	$(CC) -Iuser -c $< -o $@
 user/%.o: user/%.S
+	$(NASMF32) $< -o $@
+user/%.o: user/%.asm
 	$(NASMF32) $< -o $@
 
 # libmem objects

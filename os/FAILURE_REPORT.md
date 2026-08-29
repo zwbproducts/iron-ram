@@ -1,12 +1,60 @@
 # FAILURE REPORT: Kernel Boot Hang
 
 **Date:** 2026-08-29
-**Commit:** b712265
+**Commit:** b712265 (original hang), resolved 2026-08-29
 **Target:** 32-bit x86 protected mode, QEMU 6.2.0
+
+**STATUS: RESOLVED.** The kernel now boots, enters userland in ring 3, and the
+syscall boundary works end-to-end. Boot serial: `SLKCPQDSBIEUM1Hello from
+userland via syscall!2H` (S/L/K/C/P/Q = bootloader, D = userland copy,
+S/B/I/E = kernel entry/BSS/IDT/enter-userland, then U/M/1/.../H = userland
+syscall proof).
 
 ---
 
-## 1. LAST OBSERVABLE EVENT
+## RESOLUTION — root causes found and fixed (commit after 701172e)
+
+1. **Toolchain was entirely absent** in the session (`gcc`/`nasm`/`ld`/`qemu`/
+   `make` missing). Installed via `apt-get` (nasm, gcc-multilib, qemu-system-x86,
+   binutils, make).
+
+2. **stage1 far-jump address off by 0x100** — used `0x7D00 + (pm_entry - start)`
+   instead of `0x7C00 + (pm_entry - start)` (ORG is 0x7C00).
+
+3. **Kernel/userland copies unreachable in real mode.** Real-mode segmentation
+   (`seg*16+off`) cannot address ≥1 MB. Kernel copy needs the `0xFFFF:0x10`
+   trick to reach `0x100000`. Userland at `0x200000` is unreachable in real mode
+   at all, so it is now copied in protected mode (pm_entry, flat 32-bit) from
+   `0x10000` → `0x200000`.
+
+4. **stage1 exceeded 512-byte boot sector** (was 558 B). Rewrote with one disk
+   read loop + static GDT copy → 512 B.
+
+5. **Missing `user/%.o: user/%.asm` rule** and `isr81.o`/`isr_gpf.o` referenced
+   undefined `signal_dispatch`. Removed the legacy ISRs from KOBJS; added the
+   `.asm` user rule.
+
+6. **userland `_start` not at binary offset 0** — `usys.o` code linked before
+   `userland.o`, and the entry landed at 0xD0. Put the entry in `.text._start`
+   and ordered it first in the userland linker script, so `entry.asm` iret to
+   `0x200000` hits the real entry.
+
+7. **No TSS loaded.** Ring-3→ring-0 transitions (the `int 0x80` syscall path and
+   any #GP from ring 3) require `ESP0` from a TSS. Without it, the first syscall
+   or fault triple-faulted the CPU (silent reset, `-no-reboot` stops QEMU).
+   Added a 32-bit TSS in `entry.asm`, a descriptor placeholder in the GDT, and
+   `ltr` in `idt_init`.
+
+8. **`kern_putc`/`console_putc` used `outb %0, $0x3F8`** — `outb` with an
+   *immediate* port only accepts 8 bits, so GCC silently truncated `0x3F8`→`0xF8`
+   and output went to the wrong port. Changed to `mov $0x3F8,%dx; out %al,%dx`.
+
+9. **EFLAGS IF must be clear** at ring 3 (no timer/IRQ handler installed yet);
+   enabling IF triple-faults on the first PIT tick.
+
+---
+
+## 1. LAST OBSERVABLE EVENT (original, pre-fix)
 
 **Serial output:** `SLKCPQSIKB` (8 bytes)
 

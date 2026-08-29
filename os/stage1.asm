@@ -38,13 +38,15 @@ start:
 
     SEROUT 'S'
 
-    ; ─── Load kernel from disk ───
+    ; ─── Load kernel + userland in one loop ───
+    ; Kernel -> 0x0800:0 (RM 0x8000), Userland -> 0x1000:0 (RM 0x10000)
     SEROUT 'L'
 
-    mov  cx, KERNEL_SECTORS
+    mov  cx, KERNEL_SECTORS + USER_SECTORS
     mov  byte [sector], 2
     mov  word [buf_seg], 0x0800
     mov  word [buf_off], 0
+    mov  byte [kern_rem], KERNEL_SECTORS
 
 .read_loop:
     mov  ax, [buf_seg]
@@ -68,67 +70,28 @@ start:
     add  word [buf_seg], 0x0800
     sub  word [buf_off], 0x8000
 .no_wrap:
+    dec  byte [kern_rem]
+    jnz  .still_kernel
+    ; Switch userland destination to 0x1000:0 once kernel sectors done
+    cmp  word [buf_seg], 0x0800
+    jne  .still_kernel
+    mov  word [buf_seg], 0x1000
+    mov  word [buf_off], 0
+.still_kernel:
     inc  byte [sector]
     loop  .read_loop
 
     SEROUT 'K'
 
-    ; ─── Load userland from disk (after kernel) ───
-    SEROUT 'U'
-
-    mov  cx, USER_SECTORS
-    mov  word [buf_seg], 0x1000
-    mov  word [buf_off], 0
-
-.user_read_loop:
-    mov  ax, [buf_seg]
-    mov  es, ax
-    mov  bx, [buf_off]
-    push cx
-    mov  ah, 0x02
-    mov  al, 1
-    mov  ch, 0
-    mov  cl, [sector]
-    mov  dh, 0
-    mov  dl, [bootdrv]
-    int  0x13
-    pop  cx
-    jc  .disk_error
-
-    add  word [buf_off], 512
-    mov  ax, [buf_off]
-    cmp  ax, 0x8000
-    jb  .user_no_wrap
-    add  word [buf_seg], 0x0800
-    sub  word [buf_off], 0x8000
-.user_no_wrap:
-    inc  byte [sector]
-    loop  .user_read_loop
-
-    SEROUT 'W'
-
-    ; ─── Copy kernel from 0x8000 to 0x100000 ───
+    ; ─── Copy kernel 0x8000 -> 0x100000 (real mode, via 0xFFFF:0x10) ───
     SEROUT 'C'
     mov  ax, 0x0800
     mov  ds, ax
     xor  si, si
     mov  ax, 0xFFFF
     mov  es, ax
-    mov  di, 0x0010
+    mov  di, 0x0010            ; 0xFFFF0 + 0x10 = 0x100000
     mov  cx, KERNEL_SECTORS
-    shl  cx, 8
-    cld
-    rep  movsw
-
-    ; ─── Copy userland from 0x1000 to 0x200000 ───
-    SEROUT 'D'
-    mov  ax, 0x1000
-    mov  ds, ax
-    xor  si, si
-    mov  ax, 0xFFFF
-    mov  es, ax
-    mov  di, 0x0020
-    mov  cx, USER_SECTORS
     shl  cx, 8
     cld
     rep  movsw
@@ -136,71 +99,27 @@ start:
     SEROUT 'P'
     cli
 
-    ; Reset DS and ES to 0
     xor  ax, ax
     mov  ds, ax
     mov  es, ax
 
-    ; ─── Build GDT at 0x900 ───
-    ; Entry 0: null
-    ; Entry 1: kernel code (0x08)
-    ; Entry 2: kernel data (0x10)
-    ; Entry 3: user code (0x1B)
-    ; Entry 4: user data (0x23)
+    ; ─── Copy static GDT to 0x900 ───
+    mov  si, gdt_data
     mov  di, 0x900
+    mov  cx, gdt_end - gdt_data
+    cld
+    rep  movsb
 
-    ; Null entry
-    mov  dword [es:di], 0
-    mov  dword [es:di+4], 0
-
-    ; Kernel code: base=0, limit=4GB, DPL=0, code
-    mov  word [es:di+8], 0xFFFF       ; limit low
-    mov  word [es:di+10], 0           ; base low
-    mov  byte [es:di+12], 0           ; base mid
-    mov  byte [es:di+13], 0x9A        ; access: present, DPL=0, code, readable
-    mov  byte [es:di+14], 0xCF        ; flags: G=1, D=1, limit high=0xF
-    mov  byte [es:di+15], 0           ; base high
-
-    ; Kernel data: base=0, limit=4GB, DPL=0, data
-    mov  word [es:di+16], 0xFFFF
-    mov  word [es:di+18], 0
-    mov  byte [es:di+20], 0
-    mov  byte [es:di+21], 0x92        ; access: present, DPL=0, data, writable
-    mov  byte [es:di+22], 0xCF
-    mov  byte [es:di+23], 0
-
-    ; User code: base=0, limit=4GB, DPL=3, code
-    mov  word [es:di+24], 0xFFFF
-    mov  word [es:di+26], 0
-    mov  byte [es:di+28], 0
-    mov  byte [es:di+29], 0xFA        ; access: present, DPL=3, code, readable
-    mov  byte [es:di+30], 0xCF
-    mov  byte [es:di+31], 0
-
-    ; User data: base=0, limit=4GB, DPL=3, data
-    mov  word [es:di+32], 0xFFFF
-    mov  word [es:di+34], 0
-    mov  byte [es:di+36], 0
-    mov  byte [es:di+37], 0xF2        ; access: present, DPL=3, data, writable
-    mov  byte [es:di+38], 0xCF
-    mov  byte [es:di+39], 0
-
-    ; GDT descriptor at 0x9F0
-    mov  di, 0x9F0
-    mov  word [es:di], 40 - 1          ; limit = 5*8 - 1 = 39
-    mov  dword [es:di+2], 0x900        ; base = 0x900
-    mov  word [es:di+6], 0             ; alignment
-
-    lgdt  [es:di]
+    lgdt  [gdt_desc]
 
     ; Set CR0.PE
     mov  eax, cr0
     or   eax, 1
     mov  cr0, eax
 
-    ; Far jump to kernel code
+    ; Far jump to 32-bit pm_entry (absolute = ORG + offset)
     db  0x66, 0xEA
-    dd  0x7D00 + (pm_entry - start)    ; pm_entry absolute address
+    dd  0x7C00 + (pm_entry - start)
     dw  0x08
 
 .disk_error:
@@ -218,7 +137,7 @@ pm_entry:
     mov  dx, 0x3F8
     out  dx, al
 
-    ; Set kernel segment registers
+    ; Flat kernel data segments (base 0, limit 4GB)
     mov  ax, 0x10
     mov  ds, ax
     mov  es, ax
@@ -226,6 +145,16 @@ pm_entry:
     mov  gs, ax
     mov  ss, ax
     mov  esp, 0x9FC00
+
+    ; ─── Copy userland 0x10000 -> 0x200000 (flat 32-bit) ───
+    SEROUT 'D'
+    mov  esi, 0x10000          ; RM load address of userland
+    mov  edi, 0x200000         ; target
+    xor  ecx, ecx
+    mov  cl, [kern_rem2]       ; userland sector count (set below)
+    shl  ecx, 7                ; sectors * 128 dwords = sectors * 512 bytes
+    cld
+    rep  movsd
 
     ; Jump to kernel _start
     mov  eax, 0x100000
@@ -236,6 +165,23 @@ bootdrv  db 0
 sector   db 0
 buf_seg  dw 0
 buf_off  dw 0
+kern_rem db 0
+kern_rem2 db USER_SECTORS
+
+; ─── Static GDT (5 entries) ───
+gdt_data:
+    dd 0, 0                                  ; null
+    dw 0xFFFF, 0, 0x9A00, 0x00CF            ; kcode 0x08
+    dw 0xFFFF, 0, 0x9200, 0x00CF            ; kdata 0x10
+    dw 0xFFFF, 0, 0xFB00, 0x00CF            ; ucode 0x1B (conforming, DPL=3)
+    dw 0xFFFF, 0, 0xF200, 0x00CF            ; udata 0x23
+    ; TSS descriptor placeholder (entry 5, selector 0x28); base filled by kernel
+    dw 0x0067, 0, 0x8900, 0x0000            ; limit=103, base=0, TSS32, DPL=0
+gdt_end:
+
+gdt_desc:
+    dw gdt_end - gdt_data - 1
+    dd 0x900
 
 times 510-($-$$) db 0
 dw 0xAA55

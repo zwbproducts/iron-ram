@@ -10,9 +10,11 @@ static unsigned long kern_mem_status(void) {
 
 static int kern_putc(char c) {
     __asm__ volatile (
-        "outb %0, $0x3F8"
+        "mov $0x3F8, %%dx\n\t"
+        "out %%al, %%dx"
         :
         : "a"((unsigned char)c)
+        : "dx"
     );
     return 0;
 }

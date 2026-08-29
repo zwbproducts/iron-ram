@@ -8,6 +8,7 @@ SECTIONS
     . = 0x200000;
 
     .text : {
+        *(.text._start)
         *(.text .text.*)
     }
 

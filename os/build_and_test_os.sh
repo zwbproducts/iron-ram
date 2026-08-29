@@ -9,7 +9,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR/os"
+cd "$SCRIPT_DIR"
 
 echo "=========================================="
 echo "  iron-ram OS Build & Test"
@@ -64,7 +64,7 @@ SERIAL_CHARS=$(strings "$SERIAL_LOG" | tr -d '\n' | head -c 100)
 echo "  Raw chars: $SERIAL_CHARS"
 
 # Check for expected heartbeat sequence
-EXPECTED="SBIP"  ; # S=entry, B=BSS, I=IDT, P=print
+EXPECTED="SBIE"  ; # S=entry, B=BSS, I=IDT, E=enter userland (then U=usermode, M=mem_status ok, 1/2=tests, H=halt)
 FOUND=0
 for i in $(seq 1 ${#EXPECTED}); do
     CHAR="${EXPECTED:i-1:1}"
