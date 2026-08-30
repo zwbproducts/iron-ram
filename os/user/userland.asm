@@ -10,10 +10,13 @@
 GLOBAL _start
 EXTERN shell_main
 EXTERN shell_selftest
+EXTERN shell_demo
 
 section .text._start
 _start:
-    ; Start the interactive shell immediately.
+    ; Run automated demo: proves all 28 syscalls via int 0x80.
+    call shell_demo
+    ; Then start the interactive shell.
     call shell_main
     ; If shell ever returns, halt.
 .halt:

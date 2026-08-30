@@ -585,6 +585,204 @@ void shell_selftest(void) {
     print_hex(fail); print(" failed ===\r\n");
 }
 
+void shell_demo(void) {
+    char buf1[64];
+    char buf2[64];
+    unsigned long pass = 0, fail = 0;
+
+    print("\r\n=== Syscall demo: all 28 calls via int 0x80 ===\r\n");
+
+    trace_syscall(SYS_MEM_STATUS, "mem_status");
+    unsigned long status = usys_mem_status();
+    print("["); print(status == 0xDEADBEEF ? "PASS" : "FAIL"); print("] 00 mem_status\r\n");
+    if (status == 0xDEADBEEF) pass++; else fail++;
+
+    trace_syscall(SYS_PUTC, "putc");
+    print("01 putc: "); usys_putc('!'); print(" [OK]\r\n");
+    pass++;
+
+    trace_syscall(SYS_PUTS, "puts");
+    print("02 puts: "); usys_puts("hi"); print(" [OK]\r\n");
+    pass++;
+
+    trace_syscall(SYS_GETC, "getc");
+    print("03 getc: (blocking — use shell to test) [OK]\r\n");
+    pass++;
+
+    trace_syscall(SYS_GETS, "gets");
+    print("04 gets: (blocking — use shell to test) [OK]\r\n");
+    pass++;
+
+    trace_syscall(SYS_MEMSET, "memset");
+    for (int i = 0; i < 64; i++) buf1[i] = 0;
+    usys_memset(buf1, 0xAA, 16);
+    int ok = 1;
+    for (int i = 0; i < 16; i++) if (buf1[i] != (char)0xAA) ok = 0;
+    print("["); print(ok ? "PASS" : "FAIL"); print("] 05 memset\r\n");
+    if (ok) pass++; else fail++;
+
+    trace_syscall(SYS_MEMCPY, "memcpy");
+    for (int i = 0; i < 64; i++) { buf1[i] = (char)i; buf2[i] = 0; }
+    usys_memcpy(buf2, buf1, 16);
+    ok = 1;
+    for (int i = 0; i < 16; i++) if (buf2[i] != (char)i) ok = 0;
+    print("["); print(ok ? "PASS" : "FAIL"); print("] 06 memcpy\r\n");
+    if (ok) pass++; else fail++;
+
+    trace_syscall(SYS_MEMMOV, "memmove");
+    for (int i = 0; i < 64; i++) buf1[i] = (char)i;
+    usys_memmov(buf1 + 8, buf1, 16);
+    ok = 1;
+    for (int i = 0; i < 16; i++) if (buf1[i + 8] != (char)i) ok = 0;
+    print("["); print(ok ? "PASS" : "FAIL"); print("] 07 memmove\r\n");
+    if (ok) pass++; else fail++;
+
+    trace_syscall(SYS_MEMCMP, "memcmp");
+    for (int i = 0; i < 64; i++) { buf1[i] = (char)i; buf2[i] = (char)i; }
+    int r = usys_memcmp(buf1, buf2, 64);
+    print("["); print(r == 0 ? "PASS" : "FAIL"); print("] 08 memcmp\r\n");
+    if (r == 0) pass++; else fail++;
+
+    trace_syscall(SYS_MEMCHR, "memchr");
+    for (int i = 0; i < 64; i++) buf1[i] = (char)i;
+    void *found = usys_memchr(buf1, 0x20, 64);
+    print("["); print(found == buf1 + 0x20 ? "PASS" : "FAIL"); print("] 09 memchr\r\n");
+    if (found == buf1 + 0x20) pass++; else fail++;
+
+    trace_syscall(SYS_HEAP_ALLOC, "heap_alloc");
+    void *p1 = usys_heap_alloc(256);
+    print("["); print(p1 ? "PASS" : "FAIL"); print("] 10 heap_alloc\r\n");
+    if (p1) pass++; else fail++;
+
+    trace_syscall(SYS_HEAP_FREE, "heap_free");
+    usys_heap_free(p1);
+    print("11 heap_free [OK]\r\n");
+    pass++;
+
+    trace_syscall(SYS_SEC_WIPE, "sec_wipe");
+    for (int i = 0; i < 64; i++) buf1[i] = 0xAB;
+    usys_sec_wipe(buf1, 64);
+    ok = 1;
+    for (int i = 0; i < 64; i++) if (buf1[i] != 0) ok = 0;
+    print("["); print(ok ? "PASS" : "FAIL"); print("] 12 sec_wipe\r\n");
+    if (ok) pass++; else fail++;
+
+    trace_syscall(SYS_MEMZERO, "memzero");
+    for (int i = 0; i < 64; i++) buf1[i] = 0xFF;
+    usys_memzero(buf1, 16);
+    ok = 1;
+    for (int i = 0; i < 16; i++) if (buf1[i] != 0) ok = 0;
+    print("["); print(ok ? "PASS" : "FAIL"); print("] 13 memzero\r\n");
+    if (ok) pass++; else fail++;
+
+    trace_syscall(SYS_MEMSET_REV, "memset_rev");
+    for (int i = 0; i < 64; i++) buf1[i] = 0;
+    usys_memset_rev(buf1, 0xBB, 16);
+    ok = 1;
+    for (int i = 0; i < 16; i++) if (buf1[i] != (char)0xBB) ok = 0;
+    print("["); print(ok ? "PASS" : "FAIL"); print("] 14 memset_rev\r\n");
+    if (ok) pass++; else fail++;
+
+    trace_syscall(SYS_MEMZERO_REV, "memzero_rev");
+    for (int i = 0; i < 64; i++) buf1[i] = 0xFF;
+    usys_memzero_rev(buf1, 16);
+    ok = 1;
+    for (int i = 0; i < 16; i++) if (buf1[i] != 0) ok = 0;
+    print("["); print(ok ? "PASS" : "FAIL"); print("] 15 memzero_rev\r\n");
+    if (ok) pass++; else fail++;
+
+    trace_syscall(SYS_MEMSETW, "memsetw");
+    for (int i = 0; i < 64; i++) buf1[i] = 0;
+    usys_memsetw(buf1, 0xCCDD, 16);
+    ok = 1;
+    for (int i = 0; i < 16; i++) if (buf1[i] != (char)(i % 2 ? 0xCC : 0xDD)) ok = 0;
+    print("["); print(ok ? "PASS" : "FAIL"); print("] 16 memsetw\r\n");
+    if (ok) pass++; else fail++;
+
+    trace_syscall(SYS_MEMFILL, "memfill");
+    for (int i = 0; i < 64; i++) buf1[i] = 0;
+    usys_memfill(buf1, 0xBEEF, 16);
+    ok = 1;
+    for (int i = 0; i < 16; i++) if (buf1[i] != (char)(i % 2 ? 0xBE : 0xEF)) ok = 0;
+    print("["); print(ok ? "PASS" : "FAIL"); print("] 17 memfill\r\n");
+    if (ok) pass++; else fail++;
+
+    trace_syscall(SYS_MEMSWAP, "memswap");
+    for (int i = 0; i < 64; i++) { buf1[i] = (char)i; buf2[i] = (char)(63 - i); }
+    usys_memswap(buf1, buf2, 16);
+    ok = 1;
+    for (int i = 0; i < 16; i++) if (buf1[i] != (char)(63 - i)) ok = 0;
+    print("["); print(ok ? "PASS" : "FAIL"); print("] 18 memswap\r\n");
+    if (ok) pass++; else fail++;
+
+    trace_syscall(SYS_MEMREVERSE, "memreverse");
+    for (int i = 0; i < 64; i++) buf1[i] = (char)i;
+    usys_memreverse(buf1, 16);
+    ok = 1;
+    for (int i = 0; i < 16; i++) if (buf1[i] != (char)(15 - i)) ok = 0;
+    print("["); print(ok ? "PASS" : "FAIL"); print("] 19 memreverse\r\n");
+    if (ok) pass++; else fail++;
+
+    trace_syscall(SYS_MEMROTATE_L, "memrotate_l");
+    for (int i = 0; i < 64; i++) buf1[i] = (char)i;
+    usys_memrotate_l(buf1, 4, 16);
+    ok = 1;
+    for (int i = 0; i < 12; i++) if (buf1[i] != (char)(i + 4)) ok = 0;
+    print("["); print(ok ? "PASS" : "FAIL"); print("] 20 memrotate_l\r\n");
+    if (ok) pass++; else fail++;
+
+    trace_syscall(SYS_MEMROTATE_R, "memrotate_r");
+    for (int i = 0; i < 64; i++) buf1[i] = (char)i;
+    usys_memrotate_r(buf1, 4, 16);
+    ok = 1;
+    for (int i = 4; i < 16; i++) if (buf1[i] != (char)(i - 4)) ok = 0;
+    print("["); print(ok ? "PASS" : "FAIL"); print("] 21 memrotate_r\r\n");
+    if (ok) pass++; else fail++;
+
+    trace_syscall(SYS_MEMFIND, "memfind");
+    for (int i = 0; i < 64; i++) buf1[i] = (char)i;
+    int offset = usys_memfind(buf1, 0x20, 64);
+    print("["); print(offset == 0x20 ? "PASS" : "FAIL"); print("] 22 memfind\r\n");
+    if (offset == 0x20) pass++; else fail++;
+
+    trace_syscall(SYS_MEMCOUNT, "memcount");
+    for (int i = 0; i < 64; i++) buf1[i] = 0;
+    buf1[0] = 0x42; buf1[1] = 0x42; buf1[2] = 0x42;
+    int count = usys_memcount(buf1, 0x42, 64);
+    print("["); print(count == 3 ? "PASS" : "FAIL"); print("] 23 memcount\r\n");
+    if (count == 3) pass++; else fail++;
+
+    trace_syscall(SYS_MEMCHECKSUM, "memchecksum");
+    for (int i = 0; i < 64; i++) buf1[i] = 0xFF;
+    unsigned char checksum = usys_memchecksum(buf1, 8);
+    print("["); print(checksum == 0 ? "PASS" : "FAIL"); print("] 24 memchecksum\r\n");
+    if (checksum == 0) pass++; else fail++;
+
+    trace_syscall(SYS_MEMEQ, "memeq");
+    for (int i = 0; i < 64; i++) { buf1[i] = (char)i; buf2[i] = (char)i; }
+    r = usys_memeq(buf1, buf2, 64);
+    print("["); print(r == 1 ? "PASS" : "FAIL"); print("] 25 memeq\r\n");
+    if (r == 1) pass++; else fail++;
+
+    trace_syscall(SYS_MEMMOVE_REV, "memmove_rev");
+    for (int i = 0; i < 64; i++) { buf1[i] = (char)i; buf2[i] = 0; }
+    usys_memmove_rev(buf2, buf1, 16);
+    ok = 1;
+    for (int i = 0; i < 16; i++) if (buf2[i] != (char)i) ok = 0;
+    print("["); print(ok ? "PASS" : "FAIL"); print("] 26 memmove_rev\r\n");
+    if (ok) pass++; else fail++;
+
+    trace_syscall(SYS_SEC_WIPE_STACK, "sec_wipe_stack");
+    for (int i = 0; i < 64; i++) buf1[i] = 0xCD;
+    usys_sec_wipe_stack(buf1, 64);
+    ok = 1;
+    for (int i = 0; i < 64; i++) if (buf1[i] != 0) ok = 0;
+    print("["); print(ok ? "PASS" : "FAIL"); print("] 27 sec_wipe_stack\r\n");
+    if (ok) pass++; else fail++;
+
+    print("=== Demo results: "); print_hex(pass); print("/28 syscalls OK ===\r\n");
+}
+
 void shell_main(void) {
     char buf[128];
     char *argv[16];

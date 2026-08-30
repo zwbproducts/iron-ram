@@ -162,8 +162,17 @@ kputc:
     mov  al, 0x0A
 
 .serial:
+    push ax
+    mov  ah, al                     ; save char in AH
+    mov  dx, SERIAL + 5
+.wait:
+    in   al, dx
+    test al, 0x20                   ; bit 5 = THRE (transmitter ready)
+    jz   .wait
+    mov  al, ah                     ; restore char
     mov  dx, SERIAL
     out  dx, al
+    pop  ax
 .out:
     pop  bx
     pop  cx
@@ -245,9 +254,11 @@ demo_memset:
     popf
     jc  .fail
     mov  si, pass_str
+    call kputs
     ret
 .fail:
     mov  si, fail_str
+    call kputs
     ret
 
 ; ── Demo: memcpy (forward copy) ──
@@ -259,11 +270,9 @@ demo_memcpy:
     mov  al, 0x00
     call memsetw
     mov  di, kbuf + 16
-    mov  si, kbuf
     mov  cx, 16
     mov  al, 0xDD
     call memsetw
-    ; copy kbuf+16 -> kbuf (16 bytes)
     mov  di, kbuf
     mov  si, kbuf + 16
     mov  cx, 16
@@ -278,9 +287,11 @@ demo_memcpy:
     popf
     jc  .fail
     mov  si, pass_str
+    call kputs
     ret
 .fail:
     mov  si, fail_str
+    call kputs
     ret
 
 ; ── Demo: memmove (overlapping copy) ──
@@ -291,12 +302,10 @@ demo_memmove:
     mov  cx, KBUF_LEN
     mov  al, 0x00
     call memsetw
-    ; fill kbuf+8 with 0xEE for 16 bytes (overlaps with kbuf)
     mov  di, kbuf + 8
     mov  cx, 16
     mov  al, 0xEE
     call memsetw
-    ; memmove kbuf <- kbuf+8, 16 bytes (overlap: dst < src but overlapping)
     mov  di, kbuf
     mov  si, kbuf + 8
     mov  cx, 16
@@ -311,9 +320,11 @@ demo_memmove:
     popf
     jc  .fail
     mov  si, pass_str
+    call kputs
     ret
 .fail:
     mov  si, fail_str
+    call kputs
     ret
 
 ; ── Demo: memcmp (compare two regions) ──
@@ -328,30 +339,35 @@ demo_memcmp:
     mov  cx, 16
     mov  al, 0xBB
     call memsetw
-    ; equal comparison: kbuf vs kbuf+16
     mov  di, kbuf
     mov  si, kbuf + 16
     mov  cx, 16
     call memcmp16
     test ax, ax
-    jnz  .fail
-    ; make them different
+    jnz  .cmp_fail
     mov  byte [kbuf], 0xBC
     mov  di, kbuf
     mov  si, kbuf + 16
     mov  cx, 16
     call memcmp16
     test ax, ax
-    jz  .fail
+    jz  .cmp_fail
     pushf
     mov  si, nm_memcmp
     call kputs
     popf
-    jc  .fail
+    jc  .cmp_fail
     mov  si, pass_str
+    call kputs
     ret
-.fail:
+.cmp_fail:
+    stc
+    pushf
+    mov  si, nm_memcmp
+    call kputs
+    popf
     mov  si, fail_str
+    call kputs
     ret
 
 ; ── Demo: memchr (find byte) ──
@@ -362,7 +378,6 @@ demo_memchr:
     mov  cx, KBUF_LEN
     mov  al, 0xFF
     call memsetw
-    ; place 0x42 at offset 20
     mov  byte [kbuf + 20], 0x42
     mov  di, kbuf
     mov  al, 0x42
@@ -375,9 +390,11 @@ demo_memchr:
     popf
     jc  .fail
     mov  si, pass_str
+    call kputs
     ret
 .fail:
     mov  si, fail_str
+    call kputs
     ret
 
 ; ── Demo: memsetw (forward 16-bit word fill) ──
