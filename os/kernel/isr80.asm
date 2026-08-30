@@ -25,8 +25,8 @@ isr80_handler:
     push edi
     push ebp
 
-    ; Validate syscall number (table has entries 0..12, so 13 is invalid)
-    cmp  eax, 13             ; MAX_SYSCALLS
+    ; Validate syscall number (table has entries 0..27, so 28 is invalid)
+    cmp  eax, 28             ; SYS_MAX
     jae  .invalid
 
     ; Save syscall number and args on stack for C dispatcher

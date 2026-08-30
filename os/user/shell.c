@@ -70,13 +70,19 @@ static int tokenize(char *buf, char **argv, int maxargs) {
 static void cmd_help(void) {
     print("Commands (all via int 0x80 syscall):\r\n");
     print("  help              show this help\r\n");
-    print("  status            kernel status marker [syscall 0]\r\n");
-    print("  echo <text>       echo text [syscall 2]\r\n");
+    print("  status            kernel status [syscall 0]\r\n");
+    print("  putc <c>          put char [syscall 1]\r\n");
+    print("  puts <text>       put string [syscall 2]\r\n");
+    print("  getc              get char (blocking) [syscall 3]\r\n");
+    print("  gets              read line into buf [syscall 4]\r\n");
     print("  memset <dst> <val> <n>  fill memory [syscall 5]\r\n");
     print("  memcpy <dst> <src> <n>  copy memory [syscall 6]\r\n");
     print("  memmov <dst> <src> <n>  move memory [syscall 7]\r\n");
     print("  memcmp <a> <b> <n>      compare memory [syscall 8]\r\n");
     print("  memchr <ptr> <val> <n>  find byte [syscall 9]\r\n");
+    print("  heap_alloc <n>    allocate n bytes [syscall 10]\r\n");
+    print("  heap_free <ptr>   free heap ptr [syscall 11]\r\n");
+    print("  wipe <ptr> <n>    secure wipe [syscall 12]\r\n");
     print("  memzero <dst> <n>       zero memory [syscall 13]\r\n");
     print("  memset_rev <dst> <val> <n>  fill reverse [syscall 14]\r\n");
     print("  memzero_rev <dst> <n>   zero reverse [syscall 15]\r\n");
@@ -91,11 +97,50 @@ static void cmd_help(void) {
     print("  memchecksum <ptr> <n>   checksum [syscall 24]\r\n");
     print("  memeq <a> <b> <n>       equality [syscall 25]\r\n");
     print("  memmove_rev <dst> <src> <n> move reverse [syscall 26]\r\n");
-    print("  heap <n>          allocate n bytes [syscall 10]\r\n");
-    print("  wipe <ptr> <n>    secure wipe [syscall 12]\r\n");
     print("  wipestack <ptr> <n> secure wipe stack [syscall 27]\r\n");
     print("  selftest          run all self-tests\r\n");
     print("  halt              halt system\r\n");
+}
+
+static void cmd_putc(char **args, int nargs) {
+    if (nargs != 2) { print("Usage: putc <hex_byte>\r\n"); return; }
+    unsigned long c;
+    if (!parse_hex(args[1], &c)) { print("Error: arg must be hex\r\n"); return; }
+    trace_syscall(SYS_PUTC, "putc");
+    usys_putc((char)c);
+    print("\r\n");
+}
+
+static void cmd_puts(char **args, int nargs) {
+    if (nargs < 2) { print("Usage: puts <text>\r\n"); return; }
+    trace_syscall(SYS_PUTS, "puts");
+    for (int i = 1; i < nargs; i++) {
+        if (i > 1) printc(' ');
+        print(args[i]);
+    }
+    print("\r\n");
+}
+
+static void cmd_getc(void) {
+    trace_syscall(SYS_GETC, "getc");
+    char c = usys_getc();
+    print("  Got: '"); printc(c); print("'\r\n");
+}
+
+static void cmd_gets(void) {
+    trace_syscall(SYS_GETS, "gets");
+    char buf[256];
+    usys_gets(buf, sizeof(buf));
+    print("  Read: "); print(buf); print("\r\n");
+}
+
+static void cmd_heap_free(char **args, int nargs) {
+    if (nargs != 2) { print("Usage: heap_free <hex_ptr>\r\n"); return; }
+    unsigned long ptr;
+    if (!parse_hex(args[1], &ptr)) { print("Error: ptr must be hex\r\n"); return; }
+    trace_syscall(SYS_HEAP_FREE, "heap_free");
+    usys_heap_free((void *)ptr);
+    print("  Freed "); print_hex(ptr); print("\r\n");
 }
 
 static void cmd_status(void) {
@@ -562,8 +607,14 @@ void shell_main(void) {
             cmd_help();
         } else if (strcmp_local(argv[0], "status") == 0) {
             cmd_status();
-        } else if (strcmp_local(argv[0], "echo") == 0) {
-            cmd_echo(&argv[1], argc - 1);
+        } else if (strcmp_local(argv[0], "putc") == 0) {
+            cmd_putc(argv, argc);
+        } else if (strcmp_local(argv[0], "puts") == 0) {
+            cmd_puts(argv, argc);
+        } else if (strcmp_local(argv[0], "getc") == 0) {
+            cmd_getc();
+        } else if (strcmp_local(argv[0], "gets") == 0) {
+            cmd_gets();
         } else if (strcmp_local(argv[0], "memset") == 0) {
             cmd_memset(argv, argc);
         } else if (strcmp_local(argv[0], "memcpy") == 0) {
@@ -602,8 +653,10 @@ void shell_main(void) {
             cmd_memeq(argv, argc);
         } else if (strcmp_local(argv[0], "memmove_rev") == 0) {
             cmd_memmove_rev(argv, argc);
-        } else if (strcmp_local(argv[0], "heap") == 0) {
+        } else if (strcmp_local(argv[0], "heap_alloc") == 0) {
             cmd_heap(argv, argc);
+        } else if (strcmp_local(argv[0], "heap_free") == 0) {
+            cmd_heap_free(argv, argc);
         } else if (strcmp_local(argv[0], "wipe") == 0) {
             cmd_wipe(argv, argc);
         } else if (strcmp_local(argv[0], "wipestack") == 0) {

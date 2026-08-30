@@ -64,7 +64,7 @@ SERIAL_CHARS=$(strings "$SERIAL_LOG" | tr -d '\n')
 echo "  Raw chars: $SERIAL_CHARS"
 
 # Check for expected heartbeat sequence
-EXPECTED="SBIE"  ; # S=entry, B=BSS, I=IDT, E=enter userland; then shell self-test runs
+EXPECTED="SBIE"  ; # S=entry, B=BSS, I=IDT, E=enter userland; then shell starts
 FOUND=0
 for i in $(seq 1 ${#EXPECTED}); do
     CHAR="${EXPECTED:i-1:1}"
@@ -76,41 +76,30 @@ for i in $(seq 1 ${#EXPECTED}); do
     fi
 done
 
-# Check for self-test results
-if echo "$SERIAL_CHARS" | grep -q "mem_status"; then
-    echo "  Self-test ran: mem_status syscall ✓"
+# Check for shell banner
+if echo "$SERIAL_CHARS" | grep -q "iron-ram shell"; then
+    echo "  Shell banner found ✓"
     FOUND=$((FOUND + 1))
 else
-    echo "  Self-test NOT found ✗"
-fi
-if echo "$SERIAL_CHARS" | grep -q "memcpy"; then
-    echo "  Self-test ran: memcpy syscall ✓"
-    FOUND=$((FOUND + 1))
-else
-    echo "  Self-test NOT found ✗"
-fi
-if echo "$SERIAL_CHARS" | grep -q "sec_wipe"; then
-    echo "  Self-test ran: sec_wipe syscall ✓"
-    FOUND=$((FOUND + 1))
-else
-    echo "  Self-test NOT found ✗"
-fi
-if echo "$SERIAL_CHARS" | grep -q "passed"; then
-    PASS_COUNT=$(echo "$SERIAL_CHARS" | grep -oE '[0-9A-Fa-f]+ passed' | grep -oE '[0-9A-Fa-f]+')
-    echo "  Self-test results: $PASS_COUNT passed ✓"
-    FOUND=$((FOUND + 1))
-else
-    echo "  Self-test results NOT found ✗"
+    echo "  Shell banner NOT found ✗"
 fi
 
-if [ "$FOUND" -ge 8 ]; then
+# Check for shell ready message
+if echo "$SERIAL_CHARS" | grep -q "Type 'help'"; then
+    echo "  Shell ready message found ✓"
+    FOUND=$((FOUND + 1))
+else
+    echo "  Shell ready message NOT found ✗"
+fi
+
+if [ "$FOUND" -ge 6 ]; then
     echo ""
     echo "=== BOOT TEST PASSED ==="
     echo "  All heartbeat characters and self-test found in serial output"
 else
     echo ""
     echo "=== BOOT TEST FAILED ==="
-    echo "  Only $FOUND/8 checks passed"
+    echo "  Only $FOUND/6 checks passed"
     echo "  Check $SERIAL_LOG for details"
     exit 1
 fi

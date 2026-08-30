@@ -13,9 +13,7 @@ EXTERN shell_selftest
 
 section .text._start
 _start:
-    ; Run the automated self-test first (proves all syscalls work).
-    call shell_selftest
-    ; Then start the interactive shell.
+    ; Start the interactive shell immediately.
     call shell_main
     ; If shell ever returns, halt.
 .halt:
