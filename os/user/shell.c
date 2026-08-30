@@ -4,6 +4,10 @@
 
 #include "usys.h"
 
+#ifndef NULL
+#define NULL ((void*)0)
+#endif
+
 #define HEX_CHARS "0123456789ABCDEF"
 
 static int strlen_local(const char *s) {
@@ -267,23 +271,34 @@ void shell_selftest(void) {
     print_hex(fail); print(" failed ===\r\n");
 }
 
-void shell_main(void) {
-    char buf[128];
-    char *argv[16];
+static void run_demo(void) {
+    char demo[64];
+    char *argv[8];
+    const char *commands[] = {
+        "help",
+        "status",
+        "echo hello from ring 3 via int 0x80",
+        "memset 0x210000 41 10",
+        "memcpy 0x210010 0x210000 10",
+        "memcmp 0x210000 0x210010 10",
+        "memchr 0x210000 41 10",
+        "heap 100",
+        "heap 200",
+        "wipe 0x210000 10",
+        "selftest",
+        NULL
+    };
 
-    print("\r\n");
-    print("========================================\r\n");
-    print("  iron-ram shell — ring 3 userland\r\n");
-    print("  ALL kernel access via int 0x80 ONLY\r\n");
-    print("========================================\r\n");
-    print("Type 'help' for commands.\r\n");
+    print("\r\n=== Automated demo (no input required) ===\r\n");
 
-    for (;;) {
+    for (int i = 0; commands[i]; i++) {
         print("\r\n> ");
-        usys_gets(buf, sizeof(buf));
-
-        int argc = tokenize(buf, argv, 16);
-        if (argc == 0) continue;
+        print(commands[i]);
+        print("\r\n");
+        int n = 0;
+        while (commands[i][n] && n < 63) { demo[n] = commands[i][n]; n++; }
+        demo[n] = '\0';
+        int argc = tokenize(demo, argv, 8);
 
         if (strcmp_local(argv[0], "help") == 0) {
             cmd_help();
@@ -307,12 +322,23 @@ void shell_main(void) {
             cmd_wipe(argv, argc);
         } else if (strcmp_local(argv[0], "selftest") == 0) {
             shell_selftest();
-        } else if (strcmp_local(argv[0], "halt") == 0) {
-            cmd_halt();
-        } else {
-            print("Unknown command: ");
-            print(argv[0]);
-            print("\r\n");
         }
+    }
+
+    print("\r\n=== Demo complete. System halted. ===\r\n");
+}
+
+void shell_main(void) {
+    print("\r\n");
+    print("========================================\r\n");
+    print("  iron-ram shell — ring 3 userland\r\n");
+    print("  ALL kernel access via int 0x80 ONLY\r\n");
+    print("========================================\r\n");
+    print("Type 'help' for commands.\r\n");
+
+    run_demo();
+
+    for (;;) {
+        __asm__ volatile ("cli; hlt");
     }
 }
