@@ -94,6 +94,41 @@ cleanup_qemu() {
 }
 trap cleanup_qemu EXIT
 
+# ─── Toolchain check ───
+check_toolchain() {
+    local missing=()
+    for tool in make nasm gcc qemu-system-x86_64; do
+        if ! command -v "$tool" &>/dev/null; then
+            missing+=("$tool")
+        fi
+    done
+    if [ ${#missing[@]} -gt 0 ]; then
+        echo -e "${YELLOW}  Missing tools: ${missing[*]}${NC}"
+        if command -v apt-get &>/dev/null; then
+            echo -e "${CYAN}  Installing toolchain...${NC}"
+            apt-get update -qq 2>/dev/null
+            apt-get install -y -qq make nasm gcc gcc-multilib qemu-system-x86 2>/dev/null || {
+                echo -e "${RED}  Failed to install toolchain. Install manually:${NC}"
+                echo -e "${RED}    apt-get install make nasm gcc gcc-multilib qemu-system-x86${NC}"
+                exit 1
+            }
+        else
+            echo -e "${RED}  Required tools not found: ${missing[*]}${NC}"
+            echo -e "${RED}  Install them before running this script.${NC}"
+            exit 1
+        fi
+    fi
+    # Verify gcc-multilib works (32-bit support)
+    if ! echo 'int main(){}' | gcc -m32 -x c - -o /dev/null 2>/dev/null; then
+        echo -e "${YELLOW}  gcc -m32 not available, installing gcc-multilib...${NC}"
+        apt-get install -y -qq gcc-multilib 2>/dev/null || {
+            echo -e "${RED}  Failed to install gcc-multilib.${NC}"
+            exit 1
+        }
+    fi
+}
+check_toolchain
+
 # ─── Summary counter ───
 FAILURES=0
 
