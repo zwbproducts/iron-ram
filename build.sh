@@ -234,9 +234,22 @@ do_os() {
         -drive format=raw,file="$SCRIPT_DIR/os/disk.img" \
         -nographic -serial file:"$serial_log" -no-reboot 2>/dev/null || true
 
-    # Analyze serial output
-    local chars
-    chars=$(strings -n 1 "$serial_log" 2>/dev/null | tr -d '\n' || echo "")
+    # Debug: show serial log info
+    if [ -f "$serial_log" ]; then
+        echo "  Serial log: $serial_log ($(stat -c%s "$serial_log") bytes)"
+    else
+        echo "  WARNING: Serial log file not found: $serial_log"
+    fi
+
+    # Analyze serial output (try multiple methods for compatibility)
+    local chars=""
+    if [ -f "$serial_log" ] && [ -s "$serial_log" ]; then
+        chars=$(strings -n 1 "$serial_log" 2>/dev/null | tr -d '\n')
+    fi
+    if [ -z "$chars" ] && [ -f "$serial_log" ]; then
+        # Fallback: use cat -v for binary-safe text extraction
+        chars=$(cat -v "$serial_log" 2>/dev/null | tr -d '\n')
+    fi
     rm -f "$serial_log"
 
     # Verify boot sequence markers: S B I E
@@ -311,10 +324,23 @@ do_boot() {
         -drive format=raw,file="$SCRIPT_DIR/boot/disk.img" \
         -nographic -serial file:"$serial_log" -no-reboot 2>/dev/null || true
 
+    # Debug: show serial log info
+    if [ -f "$serial_log" ]; then
+        echo "  Serial log: $serial_log ($(stat -c%s "$serial_log") bytes)"
+    else
+        echo "  WARNING: Serial log file not found: $serial_log"
+    fi
+
     # Count [OK] and [FAIL] markers (use -a for binary-safe text matching)
     local ok_count fail_count
     ok_count=$(grep -ac '\[OK\]' "$serial_log" 2>/dev/null) || ok_count=0
     fail_count=$(grep -ac '\[FAIL\]' "$serial_log" 2>/dev/null) || fail_count=0
+
+    # Debug: show raw content if counts are zero
+    if [ "$ok_count" -eq 0 ] && [ -f "$serial_log" ] && [ -s "$serial_log" ]; then
+        echo "  DEBUG: Serial log content (first 200 chars):"
+        head -c 200 "$serial_log" | cat -v | head -5
+    fi
 
     rm -f "$serial_log"
 
