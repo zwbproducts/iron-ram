@@ -8,7 +8,7 @@
 # Build order:
 #   1. libmem/   — 32-bit x86 assembly memory library (pure C library)
 #   2. os/       — 32-bit protected-mode kernel (28 syscalls + GPF)
-#   3. boot/     — 16-bit BIOS boot stack (17 function demos)
+#   3. boot/     — 16-bit BIOS boot stack (22 function demos)
 #
 # Usage:
 #   ./build.sh            # build + test everything (default)
@@ -318,10 +318,10 @@ do_boot() {
 
     rm -f "$serial_log"
 
-    if [ "$fail_count" -eq 0 ] && [ "$ok_count" -ge 17 ]; then
+    if [ "$fail_count" -eq 0 ] && [ "$ok_count" -ge 22 ]; then
         pass "boot/ QEMU: $ok_count [OK], $fail_count [FAIL]"
     else
-        fail "boot/ QEMU: $ok_count [OK], $fail_count [FAIL] (expected >=17 [OK])"
+        fail "boot/ QEMU: $ok_count [OK], $fail_count [FAIL] (expected >=22 [OK])"
     fi
 }
 
