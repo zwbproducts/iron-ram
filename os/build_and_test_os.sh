@@ -60,11 +60,11 @@ cat "$SERIAL_LOG" | od -A x -t x1z | head -5
 # ─── Step 7: Verify boot sequence ───
 echo ""
 echo "=== Step 7: Verify boot sequence ==="
-SERIAL_CHARS=$(strings "$SERIAL_LOG" | tr -d '\n' | head -c 100)
+SERIAL_CHARS=$(strings "$SERIAL_LOG" | tr -d '\n')
 echo "  Raw chars: $SERIAL_CHARS"
 
 # Check for expected heartbeat sequence
-EXPECTED="SBIE"  ; # S=entry, B=BSS, I=IDT, E=enter userland (then U=usermode, M=mem_status ok, 1/2=tests, H=halt)
+EXPECTED="SBIE"  ; # S=entry, B=BSS, I=IDT, E=enter userland; then shell self-test runs
 FOUND=0
 for i in $(seq 1 ${#EXPECTED}); do
     CHAR="${EXPECTED:i-1:1}"
@@ -76,14 +76,41 @@ for i in $(seq 1 ${#EXPECTED}); do
     fi
 done
 
-if [ "$FOUND" -eq "${#EXPECTED}" ]; then
+# Check for self-test results
+if echo "$SERIAL_CHARS" | grep -q "mem_status"; then
+    echo "  Self-test ran: mem_status syscall ✓"
+    FOUND=$((FOUND + 1))
+else
+    echo "  Self-test NOT found ✗"
+fi
+if echo "$SERIAL_CHARS" | grep -q "memcpy"; then
+    echo "  Self-test ran: memcpy syscall ✓"
+    FOUND=$((FOUND + 1))
+else
+    echo "  Self-test NOT found ✗"
+fi
+if echo "$SERIAL_CHARS" | grep -q "sec_wipe"; then
+    echo "  Self-test ran: sec_wipe syscall ✓"
+    FOUND=$((FOUND + 1))
+else
+    echo "  Self-test NOT found ✗"
+fi
+if echo "$SERIAL_CHARS" | grep -q "passed"; then
+    PASS_COUNT=$(echo "$SERIAL_CHARS" | grep -oE '[0-9A-Fa-f]+ passed' | grep -oE '[0-9A-Fa-f]+')
+    echo "  Self-test results: $PASS_COUNT passed ✓"
+    FOUND=$((FOUND + 1))
+else
+    echo "  Self-test results NOT found ✗"
+fi
+
+if [ "$FOUND" -ge 8 ]; then
     echo ""
     echo "=== BOOT TEST PASSED ==="
-    echo "  All heartbeat characters found in serial output"
+    echo "  All heartbeat characters and self-test found in serial output"
 else
     echo ""
     echo "=== BOOT TEST FAILED ==="
-    echo "  Only $FOUND/${#EXPECTED} heartbeat characters found"
+    echo "  Only $FOUND/8 checks passed"
     echo "  Check $SERIAL_LOG for details"
     exit 1
 fi

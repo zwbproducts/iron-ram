@@ -21,7 +21,7 @@ KOBJS = kernel/entry.o kernel/idt.o kernel/isr80.o kernel/gpf.o kernel/dblf.o \
         $(LIBMEM)/secure_wipe_stack_rev.o $(LIBMEM)/secure_wipe_heap_rev.o
 
 # Userland objects
-UOBJS = user/userland.o user/usys.o
+UOBJS = user/userland.o user/usys.o user/shell.o
 
 .PHONY: all clean verify-shell disk.img
 
