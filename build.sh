@@ -227,7 +227,7 @@ do_os() {
     fi
 
     local serial_log
-    serial_log=$(mktemp)
+    serial_log=$(mktemp "$SCRIPT_DIR"/.serial_log_XXXXXX)
 
     # Run QEMU with timeout so it exits automatically
     timeout 10s qemu-system-x86_64 \
@@ -304,7 +304,7 @@ do_boot() {
     fi
 
     local serial_log
-    serial_log=$(mktemp)
+    serial_log=$(mktemp "$SCRIPT_DIR"/.serial_log_XXXXXX)
 
     # Run QEMU with timeout so it exits automatically
     timeout 10s qemu-system-x86_64 \
