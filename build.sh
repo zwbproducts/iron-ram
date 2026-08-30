@@ -236,7 +236,7 @@ do_os() {
 
     # Analyze serial output
     local chars
-    chars=$(strings "$serial_log" 2>/dev/null | tr -d '\n' || echo "")
+    chars=$(strings -n 1 "$serial_log" 2>/dev/null | tr -d '\n' || echo "")
     rm -f "$serial_log"
 
     # Verify boot sequence markers: S B I E
@@ -311,10 +311,10 @@ do_boot() {
         -drive format=raw,file="$SCRIPT_DIR/boot/disk.img" \
         -nographic -serial file:"$serial_log" -no-reboot 2>/dev/null || true
 
-    # Count [OK] and [FAIL] markers
+    # Count [OK] and [FAIL] markers (use -a for binary-safe text matching)
     local ok_count fail_count
-    ok_count=$(grep -c '\[OK\]' "$serial_log" 2>/dev/null) || ok_count=0
-    fail_count=$(grep -c '\[FAIL\]' "$serial_log" 2>/dev/null) || fail_count=0
+    ok_count=$(grep -ac '\[OK\]' "$serial_log" 2>/dev/null) || ok_count=0
+    fail_count=$(grep -ac '\[FAIL\]' "$serial_log" 2>/dev/null) || fail_count=0
 
     rm -f "$serial_log"
 

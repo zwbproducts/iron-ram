@@ -101,8 +101,8 @@ if command -v qemu-system-x86_64 &>/dev/null; then
         -drive format=raw,file="$SCRIPT_DIR/boot/disk.img" \
         -nographic -serial mon:stdio -no-reboot 2>&1 || true)
 
-    ok_count=$(echo "$qemu_out" | grep -c '\[OK\]' || true)
-    fail_count=$(echo "$qemu_out" | grep -c '\[FAIL\]' || true)
+    ok_count=$(echo "$qemu_out" | grep -ac '\[OK\]' || true)
+    fail_count=$(echo "$qemu_out" | grep -ac '\[FAIL\]' || true)
 
     if [ "$ok_count" -ge 22 ] && [ "$fail_count" -eq 0 ]; then
         pass "boot/ QEMU: $ok_count/[OK], $fail_count/[FAIL] (19 functions + 2 secure + 2 edge cases)"
