@@ -13,6 +13,7 @@
 | `boot/` (16-bit BIOS boot stack) | ✅ 0 warnings | ✅ 17/17 tests PASS in QEMU (15 functions + 2 edge cases) |
 | Security boundary | ✅ shell.c: 0 direct kernel calls | All via usys_* wrappers → int 0x80 |
 | Next.js 16 frontend | ✅ typecheck + lint clean | N/A |
+| `build.sh` | ✅ All checks pass | unified build script with --libmem/--os/--boot/--all/--clean flags |
 | `build_and_test_os.sh` | ✅ All checks pass | boot test PASS |
 | `timeline_regression.sh` | ⚠️ 32/33 commits PASS (1 historical pre-fix commit `af062ad` fails os build — pre-existing broken interim code) | |
 
@@ -24,8 +25,9 @@ The iron-ram system is complete with:
 2. **os/** — 32-bit kernel with 28 syscalls (0-27) via `int 0x80`
 3. **boot/** — 16-bit BIOS boot stack with 17 QEMU demos (15 functions + 2 edge cases)
 4. **Security** — shell.c enforces strict userland/kernel separation via syscall wrappers only
-5. **Interactive shell** — all 28 commands typed by user, each prints `[syscall N] int 0x80 -> kern_name` proof
-6. **build_and_test_os.sh** — one-command build + boot test with security verification
+  5. **Interactive shell** — all 28 commands typed by user, each prints `[syscall N] int 0x80 -> kern_name` proof
+  6. **build.sh** — unified build script: `--libmem`, `--os`, `--boot`, `--all`, `--clean`, `--qemu`, `--no-qemu`; EXIT trap kills QEMU
+  7. **build_and_test_os.sh** — one-command build + boot test with security verification
 
 ### Security Model
 
@@ -41,7 +43,12 @@ The iron-ram system is complete with:
 ## Quick Start
 
 ```bash
-cd os && make clean && make && bash build_and_test_os.sh
+./build.sh --all          # build + test everything (default)
+./build.sh --libmem       # test libmem as pure library only
+./build.sh --os           # build + test os in QEMU
+./build.sh --boot         # build + test boot in QEMU
+./build.sh --clean        # remove all build artifacts
+./build.sh --qemu         # interactive QEMU after automated tests
 ```
 
 ## Session History
@@ -71,6 +78,7 @@ cd os && make clean && make && bash build_and_test_os.sh
 | 2026-08-30 | **Fixed isr80.asm MAX_SYSCALLS bug**: `cmp eax, 13` rejected syscalls 13-27; fixed to `cmp eax, 28` so all 28 syscalls dispatch correctly |
 | 2026-08-30 | **Interactive shell restored**: removed selftest auto-run on boot; shell starts at `> ` prompt immediately |
 | 2026-08-30 | **All 28 syscalls reachable from shell**: added `putc`, `puts`, `getc`, `gets`, `heap_free` commands; every command prints `[syscall N] int 0x80 -> kern_name` proof |
+| 2026-08-30 | **Added unified `build.sh`**: flag-controlled build script (`--libmem`, `--os`, `--boot`, `--all`, `--clean`, `--qemu`, `--no-qemu`); EXIT trap kills QEMU on exit; libmem builds first as pure library, then os, then boot |
 
 ## Recently Completed
 
@@ -80,6 +88,8 @@ cd os && make clean && make && bash build_and_test_os.sh
 - [x] Every shell command prints `[syscall N] int 0x80 -> kern_name` proving kernel-only access via syscall
 - [x] Updated `build_and_test_os.sh` to verify shell banner + ready message instead of selftest output
 - [x] Build + boot test PASS
+- [x] Added unified `build.sh` with flags: `--clean`, `--libmem`, `--os`, `--boot`, `--all`, `--qemu`, `--no-qemu`
+- [x] QEMU cleanup via EXIT trap — kills any QEMU process on script exit (Unixy behavior)
 
 ## Next Steps
 
