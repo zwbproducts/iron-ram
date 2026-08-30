@@ -9,8 +9,8 @@
 | Component | Build | Run |
 |-----------|-------|-----|
 | `libmem/` (32-bit x86 memory library, 19 functions in libmymem.a + 2 in libmysecure.a) | ✅ 0 warnings | ✅ 27/27 tests PASS (test_suite), 24/24 tests PASS (test_link) |
-| `os/` (32-bit protected-mode kernel) | ✅ 0 warnings | ✅ BOOTS: interactive shell ready, all 28 syscalls dispatch via int 0x80 |
-| `boot/` (16-bit BIOS boot stack) | ✅ 0 warnings | ✅ 17/17 tests PASS in QEMU (15 functions + 2 edge cases) |
+| `os/` (32-bit protected-mode kernel) | ✅ 0 warnings | ✅ BOOTS: 28/28 syscall demo + interactive shell, all via int 0x80 |
+| `boot/` (16-bit BIOS boot stack) | ✅ 0 warnings | ✅ 22/22 demos PASS in QEMU (19 functions + 2 secure + 2 edge cases) |
 | Security boundary | ✅ shell.c: 0 direct kernel calls | All via usys_* wrappers → int 0x80 |
 | Next.js 16 frontend | ✅ typecheck + lint clean | N/A |
 | `build.sh` | ✅ All checks pass | unified build script with --libmem/--os/--boot/--all/--clean flags |
@@ -77,7 +77,8 @@ The iron-ram system is complete with:
 | 2026-08-29 | **OS BOOTS (ring 3 syscall proof)**: installed toolchain (nasm/gcc-multilib/qemu/binutils/make), fixed stage1 far-jump offset, real-mode addressing for kernel copy + PM copy for userland, 512B boot sector, removed broken isr81/isr_gpf, added `.asm` user rule, put `_start` at binary offset 0, added TSS + `ltr`, fixed `kern_putc`/`console_putc` port truncation, built GPF/double-fault handlers |
 | 2026-08-30 | **Fixed isr80.asm MAX_SYSCALLS bug**: `cmp eax, 13` rejected syscalls 13-27; fixed to `cmp eax, 28` so all 28 syscalls dispatch correctly |
 | 2026-08-30 | **Interactive shell restored**: removed selftest auto-run on boot; shell starts at `> ` prompt immediately |
-| 2026-08-30 | **All 28 syscalls reachable from shell**: added `putc`, `puts`, `getc`, `gets`, `heap_free` commands; every command prints `[syscall N] int 0x80 -> kern_name` proof |
+| 2026-08-30 | **All 28 syscalls demonstrated in os/**: shell_demo() runs at boot, prints [syscall N] int 0x80 -> kern_name proof for all 28 |
+| 2026-08-30 | **boot/ expanded to 22 demos**: added memset, memcpy, memmove, memcmp, memchr; serial fix for output corruption |
 | 2026-08-30 | **Added unified `build.sh`**: flag-controlled build script (`--libmem`, `--os`, `--boot`, `--all`, `--clean`, `--qemu`, `--no-qemu`); EXIT trap kills QEMU on exit; libmem builds first as pure library, then os, then boot |
 
 ## Recently Completed
