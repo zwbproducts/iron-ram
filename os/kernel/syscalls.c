@@ -67,35 +67,40 @@ static int ser_ready(void) {
 }
 
 /* ─── 0: mem_status ─── */
-static unsigned long kern_mem_status(void) {
+static unsigned long kern_mem_status(unsigned long a0, unsigned long a1, unsigned long a2) {
+    (void)a0; (void)a1; (void)a2;
     return 0xDEADBEEF;
 }
 
 /* ─── 1: putc ─── */
-static unsigned long kern_putc(unsigned long c) {
+static unsigned long kern_putc(unsigned long c, unsigned long a1, unsigned long a2) {
+    (void)a1; (void)a2;
     ser_out((char)c);
     return 0;
 }
 
 /* ─── 2: puts ─── */
-static unsigned long kern_puts(unsigned long s) {
+static unsigned long kern_puts(unsigned long s, unsigned long a1, unsigned long a2) {
+    (void)a1; (void)a2;
     const char *p = (const char *)s;
     while (*p) ser_out(*p++);
     return 0;
 }
 
 /* ─── 3: getc ─── */
-static unsigned long kern_getc(void) {
+static unsigned long kern_getc(unsigned long a0, unsigned long a1, unsigned long a2) {
+    (void)a0; (void)a1; (void)a2;
     while (!ser_ready()) { __asm__ volatile ("hlt"); }
     return (unsigned long)ser_in();
 }
 
 /* ─── 4: gets ─── */
-static unsigned long kern_gets(unsigned long buf, unsigned long maxlen) {
+static unsigned long kern_gets(unsigned long buf, unsigned long maxlen, unsigned long a2) {
+    (void)a2;
     char *b = (char *)buf;
     unsigned long i = 0;
     while (i < maxlen - 1) {
-        unsigned long c = kern_getc();
+        unsigned long c = kern_getc(0, 0, 0);
         if (c == '\r' || c == '\n') { b[i] = '\0'; return i; }
         if (c == 127 || c == 8) {
             if (i > 0) { i--; ser_out('\b'); ser_out(' '); ser_out('\b'); }
@@ -134,7 +139,8 @@ static unsigned long kern_memchr(unsigned long ptr, unsigned long c, unsigned lo
 }
 
 /* ─── 10: heap_alloc ─── */
-static unsigned long kern_heap_alloc(unsigned long size) {
+static unsigned long kern_heap_alloc(unsigned long size, unsigned long a1, unsigned long a2) {
+    (void)a1; (void)a2;
     size = (size + 15) & ~15UL;
     if (heap_used + size > HEAP_SIZE) return 0;
     void *ptr = heap + heap_used;
@@ -143,13 +149,14 @@ static unsigned long kern_heap_alloc(unsigned long size) {
 }
 
 /* ─── 11: heap_free ─── */
-static unsigned long kern_heap_free(unsigned long ptr) {
-    (void)ptr;
+static unsigned long kern_heap_free(unsigned long ptr, unsigned long a1, unsigned long a2) {
+    (void)ptr; (void)a1; (void)a2;
     return 0;
 }
 
 /* ─── 12: sec_wipe ─── */
-static unsigned long kern_sec_wipe(unsigned long ptr, unsigned long count) {
+static unsigned long kern_sec_wipe(unsigned long ptr, unsigned long count, unsigned long a2) {
+    (void)a2;
     volatile unsigned char *p = (volatile unsigned char *)ptr;
     for (unsigned long i = 0; i < count; i++) {
         p[i] = 0xFF; p[i] = 0x00; p[i] = 0x00;
@@ -159,7 +166,8 @@ static unsigned long kern_sec_wipe(unsigned long ptr, unsigned long count) {
 }
 
 /* ─── 13: memzero ─── */
-static unsigned long kern_memzero(unsigned long dest, unsigned long count) {
+static unsigned long kern_memzero(unsigned long dest, unsigned long count, unsigned long a2) {
+    (void)a2;
     return (unsigned long)memzero((void *)dest, count);
 }
 
@@ -169,7 +177,8 @@ static unsigned long kern_memset_rev(unsigned long dest, unsigned long c, unsign
 }
 
 /* ─── 15: memzero_rev ─── */
-static unsigned long kern_memzero_rev(unsigned long dest, unsigned long count) {
+static unsigned long kern_memzero_rev(unsigned long dest, unsigned long count, unsigned long a2) {
+    (void)a2;
     return (unsigned long)memzero_rev((void *)dest, count);
 }
 
@@ -190,7 +199,8 @@ static unsigned long kern_memswap(unsigned long a, unsigned long b, unsigned lon
 }
 
 /* ─── 19: memreverse ─── */
-static unsigned long kern_memreverse(unsigned long dest, unsigned long count) {
+static unsigned long kern_memreverse(unsigned long dest, unsigned long count, unsigned long a2) {
+    (void)a2;
     return (unsigned long)memreverse((void *)dest, count);
 }
 
@@ -215,7 +225,8 @@ static unsigned long kern_memcount(unsigned long ptr, unsigned long c, unsigned 
 }
 
 /* ─── 24: memchecksum ─── */
-static unsigned long kern_memchecksum(unsigned long ptr, unsigned long count) {
+static unsigned long kern_memchecksum(unsigned long ptr, unsigned long count, unsigned long a2) {
+    (void)a2;
     return (unsigned long)memchecksum((const void *)ptr, count);
 }
 
@@ -230,7 +241,8 @@ static unsigned long kern_memmove_rev(unsigned long dest, unsigned long src, uns
 }
 
 /* ─── 27: sec_wipe_stack ─── */
-static unsigned long kern_sec_wipe_stack(unsigned long ptr, unsigned long count) {
+static unsigned long kern_sec_wipe_stack(unsigned long ptr, unsigned long count, unsigned long a2) {
+    (void)a2;
     return (unsigned long)secure_wipe_stack_rev((void *)ptr, count);
 }
 
