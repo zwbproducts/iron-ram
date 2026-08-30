@@ -1,4 +1,4 @@
-; usys.S — Userland syscall wrappers
+; usys.S — Userland syscall wrappers (all 28 functions)
 ; These are the ONLY functions userland code can call to reach the kernel.
 ; Each wrapper loads arguments into registers and triggers int 0x80.
 ;
@@ -14,21 +14,36 @@
 SECTION .text
 
 ; Syscall numbers
-%define SYS_MEM_STATUS  0
-%define SYS_PUTC        1
-%define SYS_PUTS        2
-%define SYS_GETC        3
-%define SYS_GETS        4
-%define SYS_MEMSET      5
-%define SYS_MEMCPY      6
-%define SYS_MEMMOV      7
-%define SYS_MEMCMP      8
-%define SYS_MEMCHR      9
-%define SYS_HEAP_ALLOC  10
-%define SYS_HEAP_FREE   11
-%define SYS_SEC_WIPE    12
+%define SYS_MEM_STATUS   0
+%define SYS_PUTC         1
+%define SYS_PUTS         2
+%define SYS_GETC         3
+%define SYS_GETS         4
+%define SYS_MEMSET       5
+%define SYS_MEMCPY       6
+%define SYS_MEMMOV       7
+%define SYS_MEMCMP       8
+%define SYS_MEMCHR       9
+%define SYS_HEAP_ALLOC   10
+%define SYS_HEAP_FREE    11
+%define SYS_SEC_WIPE     12
+%define SYS_MEMZERO      13
+%define SYS_MEMSET_REV   14
+%define SYS_MEMZERO_REV  15
+%define SYS_MEMSETW      16
+%define SYS_MEMFILL      17
+%define SYS_MEMSWAP      18
+%define SYS_MEMREVERSE   19
+%define SYS_MEMROTATE_L  20
+%define SYS_MEMROTATE_R  21
+%define SYS_MEMFIND      22
+%define SYS_MEMCOUNT     23
+%define SYS_MEMCHECKSUM  24
+%define SYS_MEMEQ        25
+%define SYS_MEMMOVE_REV  26
+%define SYS_SEC_WIPE_STACK 27
 
-; Global exports — only these symbols are visible to userland
+; Global exports
 GLOBAL usys_mem_status
 GLOBAL usys_putc
 GLOBAL usys_puts
@@ -42,109 +57,82 @@ GLOBAL usys_memchr
 GLOBAL usys_heap_alloc
 GLOBAL usys_heap_free
 GLOBAL usys_sec_wipe
+GLOBAL usys_memzero
+GLOBAL usys_memset_rev
+GLOBAL usys_memzero_rev
+GLOBAL usys_memsetw
+GLOBAL usys_memfill
+GLOBAL usys_memswap
+GLOBAL usys_memreverse
+GLOBAL usys_memrotate_l
+GLOBAL usys_memrotate_r
+GLOBAL usys_memfind
+GLOBAL usys_memcount
+GLOBAL usys_memchecksum
+GLOBAL usys_memeq
+GLOBAL usys_memmove_rev
+GLOBAL usys_sec_wipe_stack
 
-; ─── SYS_MEM_STATUS (0) — return memory status marker ───
-usys_mem_status:
-    mov  eax, SYS_MEM_STATUS
+; ── Helper: single EAX arg syscall ──
+%macro SYSCALL_0 2
+%1:
+    mov  eax, %2
     int  0x80
     ret
+%endmacro
 
-; ─── SYS_PUTC (1) — output character ───
-; Input: [ESP+4] = character
-usys_putc:
-    mov  eax, SYS_PUTC
+%macro SYSCALL_1 2
+%1:
+    mov  eax, %2
     mov  ebx, [esp + 4]
     int  0x80
     ret
+%endmacro
 
-; ─── SYS_PUTS (2) — output string ───
-; Input: [ESP+4] = pointer to string
-usys_puts:
-    mov  eax, SYS_PUTS
-    mov  ebx, [esp + 4]
-    int  0x80
-    ret
-
-; ─── SYS_GETC (3) — read character ───
-usys_getc:
-    mov  eax, SYS_GETC
-    int  0x80
-    ret
-
-; ─── SYS_GETS (4) — read string ───
-; Input: [ESP+4] = buffer pointer, [ESP+8] = max length
-usys_gets:
-    mov  eax, SYS_GETS
+%macro SYSCALL_2 2
+%1:
+    mov  eax, %2
     mov  ebx, [esp + 4]
     mov  ecx, [esp + 8]
     int  0x80
     ret
+%endmacro
 
-; ─── SYS_MEMSET (5) — fill memory ───
-; Input: dest, value, count
-usys_memset:
-    mov  eax, SYS_MEMSET
-    mov  ebx, [esp + 4]    ; dest
-    mov  ecx, [esp + 8]    ; value
-    mov  edx, [esp + 12]   ; count
+%macro SYSCALL_3 2
+%1:
+    mov  eax, %2
+    mov  ebx, [esp + 4]
+    mov  ecx, [esp + 8]
+    mov  edx, [esp + 12]
     int  0x80
     ret
+%endmacro
 
-; ─── SYS_MEMCPY (6) — copy memory ───
-; Input: dest, src, count
-usys_memcpy:
-    mov  eax, SYS_MEMCPY
-    mov  ebx, [esp + 4]    ; dest
-    mov  ecx, [esp + 8]    ; src
-    mov  edx, [esp + 12]   ; count
-    int  0x80
-    ret
-
-; ─── SYS_MEMMOV (7) — move memory (overlap-safe) ───
-usys_memmov:
-    mov  eax, SYS_MEMMOV
-    mov  ebx, [esp + 4]    ; dest
-    mov  ecx, [esp + 8]    ; src
-    mov  edx, [esp + 12]   ; count
-    int  0x80
-    ret
-
-; ─── SYS_MEMCMP (8) — compare memory ───
-usys_memcmp:
-    mov  eax, SYS_MEMCMP
-    mov  ebx, [esp + 4]    ; ptr1
-    mov  ecx, [esp + 8]    ; ptr2
-    mov  edx, [esp + 12]   ; count
-    int  0x80
-    ret
-
-; ─── SYS_MEMCHR (9) — find byte in memory ───
-usys_memchr:
-    mov  eax, SYS_MEMCHR
-    mov  ebx, [esp + 4]    ; ptr
-    mov  ecx, [esp + 8]    ; value
-    mov  edx, [esp + 12]   ; count
-    int  0x80
-    ret
-
-; ─── SYS_HEAP_ALLOC (10) — allocate heap memory ───
-usys_heap_alloc:
-    mov  eax, SYS_HEAP_ALLOC
-    mov  ebx, [esp + 4]    ; size
-    int  0x80
-    ret
-
-; ─── SYS_HEAP_FREE (11) — free heap memory ───
-usys_heap_free:
-    mov  eax, SYS_HEAP_FREE
-    mov  ebx, [esp + 4]    ; ptr
-    int  0x80
-    ret
-
-; ─── SYS_SEC_WIPE (12) — secure wipe memory ───
-usys_sec_wipe:
-    mov  eax, SYS_SEC_WIPE
-    mov  ebx, [esp + 4]    ; ptr
-    mov  ecx, [esp + 8]    ; count
-    int  0x80
-    ret
+SYSCALL_0 usys_mem_status, SYS_MEM_STATUS
+SYSCALL_1 usys_putc, SYS_PUTC
+SYSCALL_1 usys_puts, SYS_PUTS
+SYSCALL_0 usys_getc, SYS_GETC
+SYSCALL_2 usys_gets, SYS_GETS
+SYSCALL_3 usys_memset, SYS_MEMSET
+SYSCALL_3 usys_memcpy, SYS_MEMCPY
+SYSCALL_3 usys_memmov, SYS_MEMMOV
+SYSCALL_3 usys_memcmp, SYS_MEMCMP
+SYSCALL_3 usys_memchr, SYS_MEMCHR
+SYSCALL_1 usys_heap_alloc, SYS_HEAP_ALLOC
+SYSCALL_1 usys_heap_free, SYS_HEAP_FREE
+SYSCALL_2 usys_sec_wipe, SYS_SEC_WIPE
+SYSCALL_2 usys_memzero, SYS_MEMZERO
+SYSCALL_3 usys_memset_rev, SYS_MEMSET_REV
+SYSCALL_2 usys_memzero_rev, SYS_MEMZERO_REV
+SYSCALL_3 usys_memsetw, SYS_MEMSETW
+SYSCALL_3 usys_memfill, SYS_MEMFILL
+SYSCALL_3 usys_memswap, SYS_MEMSWAP
+SYSCALL_2 usys_memreverse, SYS_MEMREVERSE
+SYSCALL_3 usys_memrotate_l, SYS_MEMROTATE_L
+SYSCALL_3 usys_memrotate_r, SYS_MEMROTATE_R
+SYSCALL_3 usys_memfind, SYS_MEMFIND
+SYSCALL_3 usys_memcount, SYS_MEMCOUNT
+SYSCALL_2 usys_memchecksum, SYS_MEMCHECKSUM
+SYSCALL_3 usys_memeq, SYS_MEMEQ
+SYSCALL_3 usys_memmove_rev, SYS_MEMMOVE_REV
+SYSCALL_2 usys_sec_wipe_stack, SYS_SEC_WIPE_STACK
