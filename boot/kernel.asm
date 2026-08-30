@@ -57,6 +57,11 @@ start:
     call kputs
 
     ; exercise every custom memory function, report on the kernel console
+    call demo_memset
+    call demo_memcpy
+    call demo_memmove
+    call demo_memcmp
+    call demo_memchr
     call demo_memsetw
     call demo_memzero
     call demo_memset_rev
@@ -216,6 +221,163 @@ buf_chk:
     pop  cx
     pop  ax
     stc
+    ret
+
+; ── Demo: memset (basic forward fill) ──
+demo_memset:
+    mov  ax, 0
+    mov  es, ax
+    mov  di, kbuf
+    mov  cx, KBUF_LEN
+    xor  al, al
+    call memsetw
+    mov  di, kbuf
+    mov  cx, 16
+    mov  al, 0xCC
+    call memsetw
+    mov  si, kbuf
+    mov  cx, 16
+    mov  al, 0xCC
+    call buf_chk
+    pushf
+    mov  si, nm_memset
+    call kputs
+    popf
+    jc  .fail
+    mov  si, pass_str
+    ret
+.fail:
+    mov  si, fail_str
+    ret
+
+; ── Demo: memcpy (forward copy) ──
+demo_memcpy:
+    mov  ax, 0
+    mov  es, ax
+    mov  di, kbuf
+    mov  cx, 16
+    mov  al, 0x00
+    call memsetw
+    mov  di, kbuf + 16
+    mov  si, kbuf
+    mov  cx, 16
+    mov  al, 0xDD
+    call memsetw
+    ; copy kbuf+16 -> kbuf (16 bytes)
+    mov  di, kbuf
+    mov  si, kbuf + 16
+    mov  cx, 16
+    call memcpy16
+    mov  si, kbuf
+    mov  cx, 16
+    mov  al, 0xDD
+    call buf_chk
+    pushf
+    mov  si, nm_memcpy
+    call kputs
+    popf
+    jc  .fail
+    mov  si, pass_str
+    ret
+.fail:
+    mov  si, fail_str
+    ret
+
+; ── Demo: memmove (overlapping copy) ──
+demo_memmove:
+    mov  ax, 0
+    mov  es, ax
+    mov  di, kbuf
+    mov  cx, KBUF_LEN
+    mov  al, 0x00
+    call memsetw
+    ; fill kbuf+8 with 0xEE for 16 bytes (overlaps with kbuf)
+    mov  di, kbuf + 8
+    mov  cx, 16
+    mov  al, 0xEE
+    call memsetw
+    ; memmove kbuf <- kbuf+8, 16 bytes (overlap: dst < src but overlapping)
+    mov  di, kbuf
+    mov  si, kbuf + 8
+    mov  cx, 16
+    call memmove16
+    mov  si, kbuf
+    mov  cx, 16
+    mov  al, 0xEE
+    call buf_chk
+    pushf
+    mov  si, nm_memmov
+    call kputs
+    popf
+    jc  .fail
+    mov  si, pass_str
+    ret
+.fail:
+    mov  si, fail_str
+    ret
+
+; ── Demo: memcmp (compare two regions) ──
+demo_memcmp:
+    mov  ax, 0
+    mov  es, ax
+    mov  di, kbuf
+    mov  cx, 16
+    mov  al, 0xBB
+    call memsetw
+    mov  di, kbuf + 16
+    mov  cx, 16
+    mov  al, 0xBB
+    call memsetw
+    ; equal comparison: kbuf vs kbuf+16
+    mov  di, kbuf
+    mov  si, kbuf + 16
+    mov  cx, 16
+    call memcmp16
+    test ax, ax
+    jnz  .fail
+    ; make them different
+    mov  byte [kbuf], 0xBC
+    mov  di, kbuf
+    mov  si, kbuf + 16
+    mov  cx, 16
+    call memcmp16
+    test ax, ax
+    jz  .fail
+    pushf
+    mov  si, nm_memcmp
+    call kputs
+    popf
+    jc  .fail
+    mov  si, pass_str
+    ret
+.fail:
+    mov  si, fail_str
+    ret
+
+; ── Demo: memchr (find byte) ──
+demo_memchr:
+    mov  ax, 0
+    mov  es, ax
+    mov  di, kbuf
+    mov  cx, KBUF_LEN
+    mov  al, 0xFF
+    call memsetw
+    ; place 0x42 at offset 20
+    mov  byte [kbuf + 20], 0x42
+    mov  di, kbuf
+    mov  al, 0x42
+    mov  cx, KBUF_LEN
+    call memchr16
+    cmp  di, kbuf + 20
+    pushf
+    mov  si, nm_memchr
+    call kputs
+    popf
+    jc  .fail
+    mov  si, pass_str
+    ret
+.fail:
+    mov  si, fail_str
     ret
 
 ; ── Demo: memsetw (forward 16-bit word fill) ──
@@ -905,6 +1067,11 @@ demo_edge_zero:
 k_header:   db 13, 10, "  KERNEL CONSOLE (custom mem)", 13, 10, 0
 k_summary:  db "  kernel memory functions live", 13, 10, 0
 
+nm_memset:        db "  memset      :", 0
+nm_memcpy:        db "  memcpy16    :", 0
+nm_memmov:        db "  memmove16   :", 0
+nm_memcmp:        db "  memcmp16    :", 0
+nm_memchr:        db "  memchr16    :", 0
 nm_memsetw:      db "  memsetw     :", 0
 nm_memzero:      db "  memzero16   :", 0
 nm_msrev:        db "  memset_rev16:", 0
