@@ -26,7 +26,7 @@ extern void *memmove_rev(void *dest, const void *src, unsigned long count);
 extern void *secure_wipe_stack_rev(void *stack_dest, unsigned long wipe_count);
 extern void *secure_wipe_heap_rev(void *heap_dest, unsigned long wipe_count);
 
-#define SER_PORT 0x3F8
+#define SER_PORT 0xe9
 #define HEAP_SIZE 0x10000
 
 static char heap[HEAP_SIZE];
@@ -34,7 +34,7 @@ static unsigned long heap_used = 0;
 
 static void ser_out(char c) {
     __asm__ volatile (
-        "mov $0x3F8, %%dx\n\t"
+        "mov $0xe9, %%dx\n\t"
         "out %%al, %%dx"
         :
         : "a"((unsigned char)c)
@@ -45,7 +45,7 @@ static void ser_out(char c) {
 static unsigned char ser_in(void) {
     unsigned char c;
     __asm__ volatile (
-        "mov $0x3F8, %%dx\n\t"
+        "mov $0xe9, %%dx\n\t"
         "in %%dx, %%al"
         : "=a"(c)
         :

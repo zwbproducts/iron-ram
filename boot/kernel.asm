@@ -35,7 +35,7 @@ ORG 0x8000
 %define VBYTES      (VCHARS * 2)           ; 4000 bytes (char + attr each)
 %define ROW_BYTES   (COLS * 2)             ; 160 bytes per text row
 %define ATTR        0x0F                   ; light gray on black
-%define SERIAL      0x3F8                  ; COM1 (host debug mirror)
+%define SERIAL      0xe9                   ; debugcon (host debug mirror)
 %define KBUF_LEN    64                     ; scratch buffer for demos
 
 ; ═══════════════════════════════════════════════════════

@@ -17,7 +17,7 @@ _start:
     cli
     ; Heartbeat: S = kernel entry
     mov  al, 'S'
-    mov  dx, 0x3F8
+    mov  dx, 0xe9
     out  dx, al
 
     ; Zero BSS
@@ -31,7 +31,7 @@ _start:
 
     ; Heartbeat: B = BSS cleared
     mov  al, 'B'
-    mov  dx, 0x3F8
+    mov  dx, 0xe9
     out  dx, al
 
     ; Install IDT (int 0x80 gate) and load TSS
@@ -39,7 +39,7 @@ _start:
 
     ; Heartbeat: I = IDT installed
     mov  al, 'I'
-    mov  dx, 0x3F8
+    mov  dx, 0xe9
     out  dx, al
 
     ; ─── Enter userland in ring 3 via iret ───
@@ -51,7 +51,7 @@ _start:
 
     ; Heartbeat: E = about to enter userland
     mov  al, 'E'
-    mov  dx, 0x3F8
+    mov  dx, 0xe9
     out  dx, al
 
     push dword USER_DATA      ; SS (ring 3)

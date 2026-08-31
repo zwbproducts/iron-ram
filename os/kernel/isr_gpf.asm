@@ -37,7 +37,7 @@ gpf_handler:
 
     ; Read error_code from stack (below pusha + push ds)
     mov  eax, [esp + 32 + 4]   ; = [esp+36] = error_code
-    mov  edx, 0x3F8            ; serial port
+    mov  edx, 0xe9            ; serial port
 
     test eax, 1
     jnz  .hw                    ; bit 0 set → hardware fault

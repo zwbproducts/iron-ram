@@ -7,7 +7,7 @@ section .text
 gpf_handler:
     ; CPU pushed error code, then EIP, CS, EFLAGS, (ESP, SS if ring change)
     mov  al, 'G'
-    mov  dx, 0x3F8
+    mov  dx, 0xe9
     out  dx, al
 .halt:
     cli

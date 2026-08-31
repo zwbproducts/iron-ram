@@ -226,11 +226,18 @@ do_os() {
         return
     fi
 
-    # Run QEMU with timeout, capture serial output directly via stdout
-    local chars
-    chars=$(timeout 10s qemu-system-x86_64 \
+    local serial_log
+    serial_log=$(mktemp "$SCRIPT_DIR"/.serial_log_XXXXXX)
+
+    # Run QEMU with debugcon for reliable file-based output
+    timeout 10s qemu-system-x86_64 \
         -drive format=raw,file="$SCRIPT_DIR/os/disk.img" \
-        -nographic -serial mon:stdio -no-reboot 2>/dev/null | strings -n 1 | tr -d '\n' || true)
+        -nographic -debugcon file:"$serial_log" -no-reboot 2>/dev/null || true
+
+    # Analyze serial output
+    local chars
+    chars=$(strings -n 1 "$serial_log" 2>/dev/null | tr -d '\n' || echo "")
+    rm -f "$serial_log"
 
     # Verify boot sequence markers: S B I E
     local found=0
@@ -296,16 +303,20 @@ do_boot() {
         return
     fi
 
-    # Run QEMU with timeout, capture serial output directly via stdout
-    local serial_out
-    serial_out=$(timeout 10s qemu-system-x86_64 \
-        -drive format=raw,file="$SCRIPT_DIR/boot/disk.img" \
-        -nographic -serial mon:stdio -no-reboot 2>/dev/null || true)
+    local serial_log
+    serial_log=$(mktemp "$SCRIPT_DIR"/.serial_log_XXXXXX)
 
-    # Count [OK] and [FAIL] markers (use -a for binary-safe text matching)
+    # Run QEMU with debugcon for reliable file-based output
+    timeout 10s qemu-system-x86_64 \
+        -drive format=raw,file="$SCRIPT_DIR/boot/disk.img" \
+        -nographic -debugcon file:"$serial_log" -no-reboot 2>/dev/null || true
+
+    # Count [OK] and [FAIL] markers
     local ok_count fail_count
-    ok_count=$(echo "$serial_out" | grep -ac '\[OK\]' 2>/dev/null) || ok_count=0
-    fail_count=$(echo "$serial_out" | grep -ac '\[FAIL\]' 2>/dev/null) || fail_count=0
+    ok_count=$(grep -ac '\[OK\]' "$serial_log" 2>/dev/null) || ok_count=0
+    fail_count=$(grep -ac '\[FAIL\]' "$serial_log" 2>/dev/null) || fail_count=0
+
+    rm -f "$serial_log"
 
     if [ "$fail_count" -eq 0 ] && [ "$ok_count" -ge 22 ]; then
         pass "boot/ QEMU: $ok_count [OK], $fail_count [FAIL]"

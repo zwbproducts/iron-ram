@@ -27,7 +27,7 @@ void console_cls(void) {
 void console_putc(char c) {
     /* Output to serial */
     __asm__ volatile (
-        "mov $0x3F8, %%dx\n\t"
+        "mov $0xe9, %%dx\n\t"
         "out %%al, %%dx"
         :: "a"((unsigned char)c)
         : "dx"

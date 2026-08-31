@@ -5,7 +5,7 @@ global dblf_handler
 section .text
 dblf_handler:
     mov  al, 'X'
-    mov  dx, 0x3F8
+    mov  dx, 0xe9
     out  dx, al
 .halt:
     cli
